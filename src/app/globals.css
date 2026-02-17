@@ -1,1 +1,26 @@
 @import "tailwindcss";
+
+/* Tailwind v4 සඳහා Dark Mode එක 'class' ක්‍රමයට සැකසීම */
+@theme {
+  --background: white;
+  --foreground: black;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ඩාර්ක් මෝඩ් එකට අවශ්‍ය පොදු CSS කිහිපයක් මෙතන දාන්න පුළුවන් */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
