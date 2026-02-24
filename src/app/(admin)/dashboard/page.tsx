@@ -1,23 +1,31 @@
 "use client";
 
-import { LayoutDashboard, ShoppingCart, Package, LogOut, ArrowUpRight, PlusCircle, Loader2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  LogOut,
+  ArrowUpRight,
+  PlusCircle,
+  Loader2,
+  Clock,
+  TrendingUp,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 
 export default function AdminDashboard() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const hasFetched = useRef(false);
   const [stats, setStats] = useState({
     totalSales: 0,
     newOrders: 0,
-    totalProducts: 0
+    totalProducts: 0,
   });
 
-  // ✅ createBrowserClient - cookies properly read කරයි
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -28,32 +36,40 @@ export default function AdminDashboard() {
 
     async function initDashboard() {
       try {
-        // ✅ Auth check - proxy.ts already protect කරනවා
-        // හැබැයි data fetch කිරීමට user id ඕනේ
-        const { data: { user } } = await supabase.auth.getUser();
-
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) {
           window.location.href = "/login";
           return;
         }
 
-        // Fetch Stats and Orders
         const [productRes, orderRes] = await Promise.all([
-          supabase.from('products').select('*', { count: 'exact', head: true }),
-          supabase.from('orders').select('*').order('created_at', { ascending: false })
+          supabase
+            .from("products")
+            .select("*", { count: "exact", head: true }),
+          supabase
+            .from("orders")
+            .select("*")
+            .order("created_at", { ascending: false }),
         ]);
 
         if (orderRes.data) {
           const orders = orderRes.data;
-          const totalSales = orders.reduce((acc: number, o: any) => acc + (o.total_amount || 0), 0);
-          const pendingOrders = orders.filter((o: any) => o.status === "Pending").length;
+          const totalSales = orders.reduce(
+            (acc: number, o: any) => acc + (o.total_amount || 0),
+            0
+          );
+          const pendingOrders = orders.filter(
+            (o: any) => o.status === "Pending"
+          ).length;
 
           setStats({
             totalSales,
             newOrders: pendingOrders,
-            totalProducts: productRes.count || 0
+            totalProducts: productRes.count || 0,
           });
-          setRecentOrders(orders.slice(0, 5));
+          setRecentOrders(orders.slice(0, 6));
         }
 
         hasFetched.current = true;
@@ -74,89 +90,237 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950 transition-colors">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+      <div style={{
+        minHeight: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center",
+        background: "#0d0010",
+      }}>
+        <style>{`
+          @keyframes db-spin { to { transform: rotate(360deg); } }
+          .db-spinner { animation: db-spin 0.8s linear infinite; }
+        `}</style>
+        <div style={{ textAlign: "center" }}>
+          <Loader2
+            className="db-spinner"
+            size={36}
+            style={{ color: "#f472b6", margin: "0 auto 16px" }}
+          />
+          <p style={{
+            color: "#f472b6", fontSize: 12,
+            fontWeight: 500, letterSpacing: "0.1em",
+          }}>
+            Loading Dashboard
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-black dark:text-white transition-colors duration-300">
-      {/* Sidebar */}
-      <aside className="w-64 bg-black text-white p-8 hidden md:block border-r border-gray-800 shrink-0">
-        <h2 className="text-2xl font-black italic tracking-tighter mb-10 text-white underline decoration-blue-600 underline-offset-4">REINA ADMIN.</h2>
-        <nav className="space-y-6">
-          <Link href="/dashboard" className="flex items-center gap-3 text-blue-500 font-black transition-colors">
-            <LayoutDashboard size={20} /> Dashboard
+    <div style={{
+      display: "flex", minHeight: "100vh",
+      background: "#0d0010",
+      fontFamily: "sans-serif",
+    }}>
+      <style>{`
+        @keyframes db-fadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .db-fadeUp { animation: db-fadeUp 0.5s ease-out both; }
+        
+        .db-glass {
+          background: rgba(255,255,255,0.03);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .db-nav-link {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-weight: 500;
+          font-size: 0.9rem;
+          text-decoration: none;
+          color: rgba(255,255,255,0.6);
+          transition: all 0.2s ease;
+        }
+        .db-nav-link:hover {
+          color: #fff;
+          background: rgba(244,114,182,0.1);
+        }
+        .db-nav-link.active {
+          color: #f472b6;
+          background: rgba(244,114,182,0.1);
+        }
+
+        .db-stat-card {
+          border-radius: 16px;
+          padding: 24px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.02);
+        }
+
+        .db-table-row {
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .db-add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 14px;
+          text-decoration: none;
+          color: #fff;
+          background: #ec4899;
+          transition: opacity 0.2s;
+        }
+        .db-add-btn:hover {
+          opacity: 0.9;
+        }
+      `}</style>
+
+      {/* SIDEBAR */}
+      <aside style={{
+        width: 240, flexShrink: 0,
+        padding: "30px 20px",
+        background: "rgba(0,0,0,0.2)",
+        borderRight: "1px solid rgba(255,255,255,0.05)",
+        display: "flex", flexDirection: "column",
+        position: "sticky", top: 0, height: "100vh",
+      }}>
+        {/* Brand */}
+        <div style={{ marginBottom: 40, paddingLeft: 10 }}>
+          <h2 style={{
+            fontSize: "1.5rem", fontWeight: 700, color: "#f472b6",
+          }}>
+            REINA
+          </h2>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 5, flex: 1 }}>
+          <Link href="/dashboard" className="db-nav-link active">
+            <LayoutDashboard size={18} />
+            Dashboard
           </Link>
-          <Link href="/add-product" className="flex items-center gap-3 text-gray-400 hover:text-white transition-all font-bold">
-            <PlusCircle size={20} /> Add Product
+
+          <Link href="/add-product" className="db-nav-link">
+            <PlusCircle size={18} />
+            Add Product
           </Link>
-          <Link href="/orders" className="flex items-center gap-3 text-gray-400 hover:text-white transition-all font-bold">
-            <Package size={20} /> Orders
+
+          <Link href="/orders" className="db-nav-link">
+            <Package size={18} />
+            Orders
           </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 text-red-500 mt-20 font-black hover:text-red-400 transition-colors uppercase text-xs tracking-widest"
-          >
-            <LogOut size={20} /> Logout
-          </button>
+
+          <div style={{ marginTop: "auto", paddingTop: 20 }}>
+            <button onClick={handleLogout} className="db-nav-link" style={{ border: "none", background: "none", width: "100%", cursor: "pointer", color: "#f87171" }}>
+              <LogOut size={18} />
+              Logout
+            </button>
+          </div>
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-8 lg:p-12 overflow-y-auto">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+      {/* MAIN CONTENT */}
+      <main style={{ flex: 1, padding: "40px", overflowY: "auto" }}>
+        
+        {/* Header */}
+        <header className="db-fadeUp" style={{
+          display: "flex", justifyContent: "space-between",
+          alignItems: "center", marginBottom: 40,
+        }}>
           <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter italic">Overview.</h1>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Slipper Store Live Performance</p>
+            <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#fff", margin: 0 }}>
+              Overview
+            </h1>
           </div>
-          <Link href="/add-product" className="bg-black dark:bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2 shadow-xl">
-            <PlusCircle size={18} /> New Product
+          <Link href="/add-product" className="db-add-btn">
+            <PlusCircle size={18} />
+            New Product
           </Link>
         </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          <StatCard title="Total Sales" value={`Rs. ${stats.totalSales.toLocaleString()}`} icon={<ShoppingCart />} color="blue" />
-          <StatCard title="Active Orders" value={stats.newOrders.toString().padStart(2, '0')} icon={<Package />} color="orange" isClock />
-          <StatCard title="Total Models" value={stats.totalProducts.toString()} icon={<LayoutDashboard />} color="purple" />
+        {/* Stats */}
+        <div className="db-fadeUp" style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 20, marginBottom: 40,
+        }}>
+          <div className="db-stat-card">
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 10 }}>Total Sales</p>
+            <h3 style={{ fontSize: "1.8rem", color: "#fff", margin: 0 }}>
+              Rs. {stats.totalSales.toLocaleString()}
+            </h3>
+          </div>
+
+          <div className="db-stat-card">
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 10 }}>Active Orders</p>
+            <h3 style={{ fontSize: "1.8rem", color: "#fbbf24", margin: 0 }}>
+              {stats.newOrders}
+            </h3>
+          </div>
+
+          <div className="db-stat-card">
+            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 10 }}>Total Products</p>
+            <h3 style={{ fontSize: "1.8rem", color: "#a78bfa", margin: 0 }}>
+              {stats.totalProducts}
+            </h3>
+          </div>
         </div>
 
-        {/* Recent Orders Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-gray-100 dark:border-slate-800 shadow-sm p-10">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Recent Orders.</h2>
-            <Link href="/orders" className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-blue-600">Explore All →</Link>
+        {/* Table */}
+        <div className="db-glass db-fadeUp" style={{ borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <h2 style={{ fontSize: "1.1rem", color: "#fff", margin: 0 }}>Recent Orders</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr className="border-b border-gray-50 dark:border-slate-800 text-gray-400 text-[10px] font-black uppercase tracking-widest">
-                  <th className="pb-6">Order Info</th>
-                  <th className="pb-6">Customer</th>
-                  <th className="pb-6">Status</th>
-                  <th className="pb-6 text-right">Amount</th>
+                <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                  {["Order ID", "Customer", "Amount", "Status", "Date"].map((h) => (
+                    <th key={h} style={{
+                      padding: "15px 24px", textAlign: "left",
+                      fontSize: 12, color: "rgba(255,255,255,0.4)", fontWeight: 600,
+                    }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {recentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
-                      No orders yet.
+                    <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)" }}>
+                      No orders available
                     </td>
                   </tr>
                 ) : (
                   recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50/50 transition-colors">
-                      <td className="py-6 font-mono text-[10px] text-gray-400 uppercase tracking-widest">#{order.id.slice(0, 8)}</td>
-                      <td className="py-6 italic text-black dark:text-gray-200 font-black uppercase text-xs">{order.customer_name}</td>
-                      <td className="py-6">
-                        <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-900/50">
-                          {order.status}
-                        </span>
+                    <tr key={order.id} className="db-table-row">
+                      <td style={{ padding: "15px 24px", color: "#f472b6", fontSize: 13 }}>
+                        #{order.id.slice(0, 8).toUpperCase()}
                       </td>
-                      <td className="py-6 text-right font-black text-blue-600 text-base">Rs. {order.total_amount?.toLocaleString()}</td>
+                      <td style={{ padding: "15px 24px", color: "#fff", fontSize: 14 }}>
+                        {order.customer_name}
+                      </td>
+                      <td style={{ padding: "15px 24px", color: "#fff", fontWeight: 600 }}>
+                        Rs. {order.total_amount?.toLocaleString()}
+                      </td>
+                      <td style={{ padding: "15px 24px" }}>
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td style={{ padding: "15px 24px", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -169,29 +333,22 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ title, value, icon, color, isClock = false }: any) {
-  const colorClasses: any = {
-    blue: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400",
-    orange: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400",
-    purple: "bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400",
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, { bg: string; color: string }> = {
+    Pending: { bg: "rgba(251,191,36,0.1)", color: "#fbbf24" },
+    Delivered: { bg: "rgba(52,211,153,0.1)", color: "#34d399" },
+    Cancelled: { bg: "rgba(248,113,113,0.1)", color: "#f87171" },
   };
 
+  const s = styles[status] ?? { bg: "rgba(255,255,255,0.05)", color: "#fff" };
+
   return (
-    <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-500 group">
-      <div className={`${colorClasses[color]} w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-        {icon}
-      </div>
-      <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</p>
-      <div className="flex justify-between items-end">
-        <h3 className="text-3xl font-black tracking-tighter dark:text-white">{value}</h3>
-        <div className={`${colorClasses[color]} p-1 rounded-lg`}>
-          {isClock ? (
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          ) : (
-            <ArrowUpRight size={16} />
-          )}
-        </div>
-      </div>
-    </div>
+    <span style={{
+      padding: "4px 10px", borderRadius: "6px",
+      background: s.bg, color: s.color,
+      fontSize: 11, fontWeight: 600,
+    }}>
+      {status}
+    </span>
   );
 }
