@@ -1,28 +1,32 @@
-// Order එකක තිබිය හැකි අවස්ථා (Status)
-export type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type OrderStatus =
+  | "Pending"
+  | "Processing"
+  | "Shipped"
+  | "Delivered"
+  | "Cancelled"
+  | (string & {});
 
-// සෙරෙප්පු අයිතමයක (Slipper Item) ව්‍යුහය
 export interface SlipperItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
-  size: string;
-  color?: string; // Optional - අවශ්‍ය නම් පමණක් පාවිච්චි කළ හැක
+  size?: string;
+  color?: string;
   image_url: string;
 }
 
-// සම්පූර්ණ Order එකක ව්‍යුහය (Reina Order Interface)
 export interface ReinaOrder {
   id: string;
   customer_name: string;
-  customer_email: string;
+  customer_email?: string | null;
   phone: string;
   address: string;
-  items: SlipperItem[]; // මෙතැන 'any[]' වෙනුවට 'SlipperItem[]' යෙදීමෙන් error එක විසඳේ
+  items: SlipperItem[];
   total_amount: number;
   status: OrderStatus;
-  is_cod: boolean;
+  is_cod?: boolean | null;
   created_at: string;
-  tracking_number?: string;
+  tracking_number?: string | null;
 }
+

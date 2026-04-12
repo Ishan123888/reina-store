@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { Package, Truck, CheckCircle, Clock, ExternalLink, Loader2, Search } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { Package, Truck, CheckCircle, Clock, ExternalLink, Loader2, Download } from "lucide-react";
+import Link from "next/link";
+import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
+  const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -20,6 +17,7 @@ export default function AdminOrdersPage() {
 
   async function fetchOrders() {
     setLoading(true);
+    const supabase = getSupabaseBrowserClient();
     const { data, error } = await supabase
       .from("orders")
       .select("*")
@@ -30,6 +28,7 @@ export default function AdminOrdersPage() {
   }
 
   async function updateStatus(orderId: string, newStatus: string) {
+    const supabase = getSupabaseBrowserClient();
     const { error } = await supabase
       .from("orders")
       .update({ status: newStatus })
@@ -37,6 +36,30 @@ export default function AdminOrdersPage() {
 
     if (!error) {
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    }
+  }
+
+  async function downloadInvoice(orderId: string) {
+    setDownloadingInvoice(orderId);
+    try {
+      const response = await fetch(`/api/invoices/${orderId}`);
+      const data = await response.json();
+      
+      const blob = new Blob([data.html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Invoice-${orderId.substring(0, 8).toUpperCase()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading invoice:", error);
+      alert("Failed to generate invoice");
+    } finally {
+      setDownloadingInvoice(null);
     }
   }
 
@@ -62,7 +85,7 @@ export default function AdminOrdersPage() {
               <button
                 key={s}
                 onClick={() => setFilter(s)}
-                className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all ${filter === s ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-black'}`}
+                className={`px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${filter === s ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-black'}`}
               >
                 {s}
               </button>
@@ -103,7 +126,7 @@ export default function AdminOrdersPage() {
                   <div className="flex-1 bg-gray-50 rounded-3xl p-6 border border-gray-100">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Ordered Items</p>
                     <div className="space-y-3">
-                      {order.items.map((item: any, idx: number) => (
+                      {(Array.isArray(order.items) ? order.items : []).map((item: any, idx: number) => (
                         <div key={idx} className="flex justify-between items-center text-xs font-bold uppercase">
                           <span className="text-gray-900">{item.quantity}x {item.name}</span>
                           <span className="text-gray-400">Rs. {(item.price * item.quantity).toLocaleString()}</span>
@@ -132,6 +155,21 @@ export default function AdminOrdersPage() {
                       >
                         <CheckCircle size={14} /> Delivered
                       </button>
+                      <button
+                        onClick={() => downloadInvoice(order.id)}
+                        disabled={downloadingInvoice === order.id}
+                        className="lg:w-40 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                      >
+                        {downloadingInvoice === order.id ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={14} /> Invoice
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -144,3 +182,4 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
+

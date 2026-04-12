@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, LogIn, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Sparkles, LogIn, AlertCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
-import { useTheme } from "next-themes";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,279 +12,129 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  
-  // Navbar එකේ ඇති theme එක ලබා ගැනීම
-  const { theme, resolvedTheme } = useTheme();
 
-  // Hydration error එක මගහැරීමට (Next.js client-side mounted ද කියා බැලීම)
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  const validateForm = () => {
+    if (!email || !password) return "Please fill in all fields.";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return "Please enter a valid email address.";
+    return null;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationError = validateForm();
+    if (validationError) { setError(validationError); return; }
+
     setLoading(true);
     setError(null);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // 1. Authenticate User
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
       });
 
-      if (authError || !authData.user) {
-        setError("Invalid email or password. Please try again.");
+      if (authError) {
+        setError(authError.message === "Invalid login credentials" ? "Incorrect email or password." : authError.message);
         setLoading(false);
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", authData.user.id)
-        .single();
+      if (authData?.user) {
+        // 2. Fetch Profile to check Role
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", authData.user.id)
+          .maybeSingle(); // error එකක් දෙන්නේ නැතුව null දෙනවා profile එක නැත්නම්
 
-      if (profile?.role === "admin") {
-        window.location.href = "/dashboard";
-      } else {
-        window.location.href = "/collections";
+        if (profileError) {
+          throw new Error("Error fetching user profile.");
+        }
+
+        if (!profile) {
+          // Profile එකක් නැත්නම් session එක අයින් කරලා error එකක් පෙන්වනවා
+          await supabase.auth.signOut();
+          setError("User profile not found. Please contact support.");
+          setLoading(false);
+          return;
+        }
+
+        // 3. Optimized Redirect Logic
+        const targetRoute = profile.role === "admin" ? "/dashboard" : "/collections";
+        window.location.href = targetRoute;
       }
-    } catch (err) {
-      console.error("Login error:", err);
-      setError("Something went wrong. Please try again.");
-      setLoading(false);
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      setError("An unexpected error occurred. Please try again.");
+      setLoading(false); // මෙතනදී loading එක false කරන එක අනිවාර්යයි
     }
   };
 
-  // වර්තමාන theme එක Dark ද කියා පරීක්ෂා කිරීම
-  const isDarkMode = mounted && (theme === "dark" || resolvedTheme === "dark");
-
-  // UI Colors based on Theme
-  const ui = {
-    bg: isDarkMode 
-      ? "linear-gradient(135deg, #0d0010 0%, #1a0018 50%, #0d0010 100%)" 
-      : "linear-gradient(135deg, #fff5f7 0%, #fce7f3 50%, #fff5f7 100%)",
-    cardBg: isDarkMode ? "rgba(255, 255, 255, 0.03)" : "rgba(255, 255, 255, 0.85)",
-    cardBorder: isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(236, 72, 153, 0.2)",
-    textColor: isDarkMode ? "#ffffff" : "#1a0018",
-    labelColor: isDarkMode ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.5)",
-    inputBg: isDarkMode ? "rgba(255, 255, 255, 0.03)" : "#ffffff",
-    inputBorder: isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(236, 72, 153, 0.2)",
-    shadow: isDarkMode ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "0 20px 40px rgba(236, 72, 153, 0.15)",
-  };
-
-  if (!mounted) return null; // Hydration ගැටළු මගහැරීමට
+  if (!mounted) return null;
 
   return (
     <div style={{
-      minHeight: "calc(100vh - 80px)", // Navbar එකට ඉඩ තබා
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: ui.bg,
-      fontFamily: "sans-serif",
-      padding: "20px",
-      transition: "all 0.5s ease"
+      minHeight: "100vh", backgroundColor: "#020408", display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "20px", fontFamily: "'Inter', sans-serif",
+      backgroundImage: `radial-gradient(circle at 50% -20%, #111827, transparent), radial-gradient(circle at 0% 100%, #030712, transparent)`
     }}>
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .login-card {
-          animation: fadeIn 0.8s ease-out;
-        }
-        .input-focus:focus {
-          border-color: #ec4899 !important;
-          box-shadow: 0 0 15px rgba(236, 72, 153, 0.2);
-          outline: none;
-        }
-        .btn-pink {
-          background: linear-gradient(135deg, #be185d, #ec4899, #f472b6);
-          transition: transform 0.2s, box-shadow 0.2s;
-          border: none;
-          color: white;
-        }
-        .btn-pink:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(236, 72, 153, 0.4);
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&display=swap');
+        .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .input-field { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; width: 100%; padding: 12px 14px; border-radius: 10px; font-size: 14px; outline: none; transition: 0.2s; box-sizing: border-box; }
+        .input-field:focus { border-color: #22d3ee; background: rgba(34, 211, 238, 0.05); box-shadow: 0 0 0 1px #22d3ee; }
+        .btn-main { background: #fff; color: #000; width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-main:hover:not(:disabled) { background: #22d3ee; transform: translateY(-1px); }
+        .btn-main:disabled { opacity: 0.6; cursor: not-allowed; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
-      <div className="login-card" style={{
-        width: "100%",
-        maxWidth: "420px",
-        background: ui.cardBg,
-        backdropFilter: "blur(20px)",
-        border: `1px solid ${ui.cardBorder}`,
-        boxShadow: ui.shadow,
-        borderRadius: "32px",
-        padding: "48px 32px",
-        position: "relative",
-        overflow: "hidden",
-        transition: "all 0.5s ease"
-      }}>
-        <div style={{
-          position: "absolute",
-          top: "-10%",
-          right: "-10%",
-          width: "150px",
-          height: "150px",
-          background: "rgba(236, 72, 153, 0.2)",
-          filter: "blur(50px)",
-          borderRadius: "50%"
-        }} />
-
-        <div style={{ textAlign: "center", marginBottom: "36px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-            <Sparkles size={16} style={{ color: "#ec4899" }} />
-            <span style={{ color: "#ec4899", fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase" }}>
-              Secure Login
-            </span>
+      <div className="glass-card" style={{ width: "100%", maxWidth: "380px", padding: "32px" }}>
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+          <div style={{ width: 44, height: 44, background: "rgba(34, 211, 238, 0.1)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <Sparkles size={20} style={{ color: "#22d3ee" }} />
           </div>
-          <h1 style={{ 
-            color: ui.textColor, 
-            fontSize: "2.5rem", 
-            fontWeight: 800, 
-            margin: 0,
-            letterSpacing: "-0.02em" 
-          }}>
-            Welcome Back
-          </h1>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "1.5rem", color: "#fff", margin: 0 }}>Welcome Back</h2>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "4px" }}>Sign in to continue to Reina</p>
         </div>
 
         {error && (
-          <div style={{
-            background: "rgba(248, 113, 113, 0.1)",
-            border: "1px solid rgba(248, 113, 113, 0.2)",
-            color: "#f87171",
-            padding: "12px 16px",
-            borderRadius: "12px",
-            fontSize: "13px",
-            marginBottom: "24px",
-            textAlign: "center"
-          }}>
-            {error}
+          <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "10px 12px", borderRadius: 8, fontSize: "12px", display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+            <AlertCircle size={14} /> {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ color: ui.labelColor, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", paddingLeft: "4px" }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="name@example.com"
-              className="input-focus"
-              style={{
-                background: ui.inputBg,
-                border: `1px solid ${ui.inputBorder}`,
-                borderRadius: "16px",
-                padding: "16px",
-                color: ui.textColor,
-                fontSize: "14px",
-                transition: "all 0.3s"
-              }}
-            />
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+          <div>
+            <label style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", marginBottom: "6px", display: "block", fontWeight: 600, letterSpacing: "0.05em" }}>EMAIL</label>
+            <input className="input-field" type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ color: ui.labelColor, fontSize: "11px", fontWeight: 600, textTransform: "uppercase", paddingLeft: "4px" }}>
-              Password
-            </label>
+          <div>
+            <label style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", marginBottom: "6px", display: "block", fontWeight: 600, letterSpacing: "0.05em" }}>PASSWORD</label>
             <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="input-focus"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  background: ui.inputBg,
-                  border: `1px solid ${ui.inputBorder}`,
-                  borderRadius: "16px",
-                  padding: "16px",
-                  paddingRight: "50px",
-                  color: ui.textColor,
-                  fontSize: "14px",
-                  transition: "all 0.3s"
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: "absolute",
-                  right: "16px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  color: ui.labelColor,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center"
-                }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              <input className="input-field" type={showPassword ? "text" : "password"} placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer" }}>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-pink"
-            style={{
-              marginTop: "10px",
-              padding: "16px",
-              borderRadius: "16px",
-              fontSize: "14px",
-              fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "10px",
-              opacity: loading ? 0.7 : 1
-            }}
-          >
-            {loading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <>
-                <LogIn size={18} />
-                SIGN IN
-              </>
-            )}
+          <button type="submit" className="btn-main" disabled={loading} style={{ marginTop: "4px" }}>
+            {loading ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <>Sign In <LogIn size={16} /></>}
           </button>
         </form>
 
-        <div style={{ marginTop: "32px", textAlign: "center" }}>
-          <p style={{ color: ui.labelColor, fontSize: "12px" }}>
-            Don't have an account?{" "}
-            <Link href="/register" style={{ 
-              color: "#ec4899", 
-              textDecoration: "none", 
-              fontWeight: 600,
-              marginLeft: "4px"
-            }}>
-              Create one
-            </Link>
-          </p>
-        </div>
+        <p style={{ textAlign: "center", fontSize: "13px", color: "rgba(255,255,255,0.4)", marginTop: "24px" }}>
+          New to Reina? <Link href="/register" style={{ color: "#22d3ee", textDecoration: "none", fontWeight: 600 }}>Create account</Link>
+        </p>
       </div>
     </div>
   );

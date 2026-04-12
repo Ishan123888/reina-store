@@ -5,7 +5,7 @@ export default async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
   const pathname = url.pathname
 
-  // Static/API routes skip
+  // 1. Static/API routes skip කිරීම (Performance සඳහා)
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
@@ -36,39 +36,44 @@ export default async function proxy(request: NextRequest) {
     }
   )
 
+  // User session එක ලබා ගැනීම
   const { data: { user } } = await supabase.auth.getUser()
-  console.log('[PROXY]', pathname, '| user:', user?.email ?? 'NO USER', '| error: none')
 
   // ✅ RULE: Admin pages protect කිරීම පමණයි
-  // /dashboard, /add-product, /orders → login නෑ නම් → /login
-  // login ඇති නමුත් admin නොවේ → /collections
-  if (
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/add-product') ||
+  const isAdminPath = 
+    pathname.startsWith('/dashboard') || 
+    pathname.startsWith('/add-product') || 
     pathname.startsWith('/orders')
-  ) {
+
+  if (isAdminPath) {
+    // 1. User ලොග් වෙලා නැතිනම් /login පේජ් එකට යවන්න
     if (!user) {
-      console.log('[PROXY] No user → /login')
+      console.log('[PROXY] No user → Redirecting to /login')
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    try {
+      // 2. Profiles table එකෙන් Role එක ලබා ගැනීම
+      // .single() පාවිච්චි කරද්දී දත්ත නැති වුණොත් හිර නොවෙන්නයි මෙතැන try-catch දාලා තියෙන්නේ
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle() // මෙතැන maybeSingle පාවිච්චි කිරීම වඩාත් සුදුසුයි loading හිර නොවෙන්න
 
-    const isAdmin = profile?.role === 'admin'
-    console.log('[PROXY] Role:', profile?.role, '| isAdmin:', isAdmin)
+      const isAdmin = profile?.role === 'admin'
+      console.log(`[PROXY] Path: ${pathname} | User: ${user.email} | Role: ${profile?.role} | isAdmin: ${isAdmin}`)
 
-    if (!isAdmin) {
-      console.log('[PROXY] Not admin → /collections')
+      // 3. Admin කෙනෙක් නෙවෙයි නම් Dashboard එකට යන්න නොදී /collections වලට යවන්න
+      if (error || !isAdmin) {
+        console.log('[PROXY] Not admin or DB error → Redirecting to /collections')
+        return NextResponse.redirect(new URL('/collections', request.url))
+      }
+    } catch (err) {
+      console.error('[PROXY] Database fetch error:', err)
       return NextResponse.redirect(new URL('/collections', request.url))
     }
   }
-
-  // ✅ /login redirect loop නෑ — login page ඇතුළෙදී client-side role check කරලා redirect
-  // proxy.ts ඇතුළෙ /login redirect කළොත් loop වෙනවා, ඒ නිසා ඉවත් කළා
 
   return response
 }
