@@ -26,7 +26,14 @@ function useSupabase() {
 }
 
 const CATEGORIES = [
-  "Casual", "Formal", "Sport", "Beach", "Home", "Kids", "Ladies", "Gents",
+  "Casual",
+  "Formal",
+  "Sport",
+  "Beach",
+  "Home",
+  "Kids",
+  "Ladies",
+  "Gents",
 ];
 
 export default function AddProductPage() {
@@ -37,9 +44,14 @@ export default function AddProductPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const emptyForm = {
-    name: "", price: "", description: "",
-    category: "Casual", stock: "0", item_id: "",
+    name: "",
+    price: "",
+    description: "",
+    category: "Casual",
+    stock: "0",
+    item_id: "",
   };
+
   const [formData, setFormData] = useState(emptyForm);
   const [colors, setColors] = useState<string[]>([]);
   const [currentColor, setCurrentColor] = useState("");
@@ -47,7 +59,8 @@ export default function AddProductPage() {
   const [currentSize, setCurrentSize] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [toast, setToast] =
+    useState<{ msg: string; type: "ok" | "err" } | null>(null);
 
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
@@ -56,28 +69,42 @@ export default function AddProductPage() {
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
-      .from("products").select("*").order("created_at", { ascending: false });
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     if (!error) setProducts(data || []);
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const addTag = (
-    value: string, list: string[],
-    setList: (v: string[]) => void, setInput: (v: string) => void
+    value: string,
+    list: string[],
+    setList: (v: string[]) => void,
+    setInput: (v: string) => void
   ) => {
     const t = value.trim();
-    if (t && !list.includes(t)) { setList([...list, t]); setInput(""); }
+    if (t && !list.includes(t)) {
+      setList([...list, t]);
+      setInput("");
+    }
   };
 
-  const removeTag = (value: string, list: string[], setList: (v: string[]) => void) =>
-    setList(list.filter((i) => i !== value));
+  const removeTag = (
+    value: string,
+    list: string[],
+    setList: (v: string[]) => void
+  ) => setList(list.filter((i) => i !== value));
 
   const handleImageChange = (file: File | null) => {
     setImageFile(file);
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target?.result as string);
+      reader.onload = (e) =>
+        setImagePreview(e.target?.result as string);
       reader.readAsDataURL(file);
     } else {
       setImagePreview(null);
@@ -86,21 +113,31 @@ export default function AddProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (colors.length === 0 || sizes.length === 0) {
       showToast("Please add at least one Color and Size.", "err");
       return;
     }
+
     setLoading(true);
+
     try {
       let imageUrl = "";
+
       if (imageFile) {
         const ext = imageFile.name.split(".").pop();
         const path = `products/${Date.now()}.${ext}`;
+
         const { error: upErr } = await supabase.storage
-          .from("slipper-images").upload(path, imageFile);
+          .from("slipper-images")
+          .upload(path, imageFile);
+
         if (upErr) throw upErr;
+
         const { data: urlData } = supabase.storage
-          .from("slipper-images").getPublicUrl(path);
+          .from("slipper-images")
+          .getPublicUrl(path);
+
         imageUrl = urlData.publicUrl;
       }
 
@@ -114,21 +151,31 @@ export default function AddProductPage() {
         colors,
         sizes,
       };
+
       if (imageUrl) payload.image_url = imageUrl;
 
       if (editingId) {
-        const { error } = await supabase.from("products").update(payload).eq("id", editingId);
+        const { error } = await supabase
+          .from("products")
+          .update(payload)
+          .eq("id", editingId);
+
         if (error) throw error;
         showToast("Product updated successfully!");
       } else {
-        const { error } = await supabase.from("products").insert([payload]);
+        const { error } = await supabase
+          .from("products")
+          .insert([payload]);
+
         if (error) throw error;
         showToast("Product published successfully!");
       }
 
       setFormData(emptyForm);
-      setColors([]); setSizes([]);
-      setImageFile(null); setImagePreview(null);
+      setColors([]);
+      setSizes([]);
+      setImageFile(null);
+      setImagePreview(null);
       setEditingId(null);
       fetchProducts();
     } catch (err: any) {
@@ -147,28 +194,34 @@ export default function AddProductPage() {
 
   const startEdit = (p: any) => {
     setEditingId(p.id);
+
     setFormData({
-      name: p.name || "", item_id: p.item_id || "",
+      name: p.name || "",
+      item_id: p.item_id || "",
       price: p.price?.toString() || "",
       description: p.description || "",
       category: p.category || "Casual",
       stock: p.stock_quantity?.toString() || "0",
     });
+
     setColors(Array.isArray(p.colors) ? p.colors : []);
     setSizes(Array.isArray(p.sizes) ? p.sizes : []);
     setImagePreview(p.image_url || null);
     setImageFile(null);
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setFormData(emptyForm);
-    setColors([]); setSizes([]);
-    setImageFile(null); setImagePreview(null);
+    setColors([]);
+    setSizes([]);
+    setImageFile(null);
+    setImagePreview(null);
   };
 
-  return (
+ return (
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(135deg, #0d0010 0%, #180015 40%, #0d0010 100%)",
@@ -843,7 +896,9 @@ export default function AddProductPage() {
             </table>
           </div>
         </div>
-      </div>
+      </div> 
+
+
     </div>
-  );
+ );
 }

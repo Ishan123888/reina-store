@@ -1,127 +1,100 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useState } from "react";
-import type { ReactNode } from "react";
+import Image from "next/image";
 import {
-  UserPlus,
-  Mail,
-  Lock,
-  User,
-  Loader2,
   Eye,
   EyeOff,
+  Loader2,
   CheckCircle,
-  Phone,
-  MapPin,
-  AlertCircle,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
+/* Images */
+const images = [
+  "https://i.imgur.com/VG7Jjw0.jpeg",
+  "https://i.imgur.com/nP2cWaY.jpeg",
+  "https://imgur.com/K1YRX5o.png",
+];
+
+interface FormData {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  password: string;
+}
+
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
+  const [currentImage, setCurrentImage] = useState(0);
+
+  const [form, setForm] = useState<FormData>({
     name: "",
     email: "",
     phone: "",
     address: "",
     password: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+
+  const [focused, setFocused] = useState<string | null>(null);
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const validateForm = () => {
-    const { name, email, phone, address, password } = formData;
-
-    if (!name || !email || !phone || !address || !password) return "All fields are required.";
-    if (name.trim().length < 3) return "Name must be at least 3 characters long.";
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) return "Please enter a valid email address.";
-
-    const phoneRegex = /^(07[0-9]{8})$/;
-    if (!phoneRegex.test(phone.trim())) return "Enter a valid Sri Lankan phone number (e.g., 0712345678).";
-
-    if (address.trim().length < 5) return "Please provide a more complete address.";
-    if (password.length < 6) return "Password must be at least 6 characters.";
-
-    return null;
-  };
+  /* Background slider */
+  useEffect(() => {
+    const i = setInterval(() => {
+      setCurrentImage((p) => (p + 1) % images.length);
+    }, 4000);
+    return () => clearInterval(i);
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    setLoading(true);
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email.trim(),
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.name.trim(),
-            phone: formData.phone.trim(),
-            address: formData.address.trim(),
-          },
+    const { data, error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: {
+          full_name: form.name,
+          phone: form.phone,
+          address: form.address,
         },
-      });
+      },
+    });
 
-      if (authError) {
-        if (authError.message.includes("already")) {
-          throw new Error("This email is already registered.");
-        }
-        throw authError;
-      }
-
-      if (!authData.user) throw new Error("Registration failed. Please try again.");
-
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: authData.user.id,
-        email: formData.email.trim(),
-        full_name: formData.name.trim(),
-        phone: formData.phone.trim(),
-        address: formData.address.trim(),
+    if (!error) {
+      await supabase.from("profiles").upsert({
+        id: data.user?.id,
+        email: form.email,
+        full_name: form.name,
+        phone: form.phone,
+        address: form.address,
         role: "customer",
-      } as any);
-
-      if (profileError) console.error("Profile sync error:", profileError);
-
-      if (authData.session) {
-        await supabase.auth.signOut();
-      }
-
-      setEmailSent(true);
-    } catch (err: any) {
-      setError(err.message || "An error occurred during registration.");
-    } finally {
-      setIsLoading(false);
+      });
+      setSuccess(true);
     }
+
+    setLoading(false);
   };
 
-  if (emailSent) {
+  if (success) {
     return (
-      <div className="app-surface min-h-screen flex items-center justify-center p-5">
-        <div className="glass-panel w-full max-w-[24rem] p-10 text-center rounded-[1.25rem]">
-          <div className="w-14 h-14 rounded-full bg-emerald-400/12 border border-emerald-300/20 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle size={28} className="text-emerald-300" />
-          </div>
-          <h2 className="section-title text-2xl text-white mb-2">Verify Email</h2>
-          <p className="text-sm text-white/50 leading-relaxed mb-6">
-            Account created for <b>{formData.email}</b>. Verify email (if required), then login to open your customer dashboard.
-          </p>
-          <Link href="/login?next=/customer-dashboard" className="btn-primary-modern block py-3">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="text-center">
+          <CheckCircle size={42} className="text-green-400 mb-4 mx-auto" />
+          <h2 className="text-white text-2xl font-semibold">
+            Account Created
+          </h2>
+          <Link href="/login" className="text-cyan-400 mt-4 block">
             Go to Login
           </Link>
         </div>
@@ -130,114 +103,134 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="app-surface min-h-screen flex items-center justify-center p-5">
-      <div className="glass-panel w-full max-w-104 p-8 rounded-[1.25rem]">
-        <div className="text-center mb-6">
-          <h2 className="section-title text-[1.6rem] text-white">Create Account</h2>
-          <p className="text-xs text-white/45 mt-1">Join Reina shopping community</p>
-        </div>
+    <div className="min-h-screen grid md:grid-cols-2 bg-slate-950">
 
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-400/25 bg-red-500/10 text-red-300 text-xs px-3 py-2 flex items-center gap-2">
-            <AlertCircle size={14} /> {error}
+      {/* LEFT IMAGE */}
+      <div className="relative hidden md:block">
+        {images.map((img, i) => (
+          <Image
+            key={i}
+            src={img}
+            alt=""
+            fill
+            className={`object-cover transition-opacity duration-1000 ${
+              i === currentImage ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+
+      {/* RIGHT FORM */}
+      <div className="flex items-center justify-center px-6 py-12">
+        <form className="w-full max-w-md space-y-6" onSubmit={handleRegister}>
+
+          <div>
+            <h1 className="text-2xl text-white font-semibold">
+              Create account
+            </h1>
+            <p className="text-sm text-slate-400">
+              Enter your details to continue
+            </p>
           </div>
-        )}
 
-        <form onSubmit={handleRegister} className="flex flex-col gap-3.5">
-          <div className="grid grid-cols-[1.2fr_0.8fr] gap-3">
-            <Field label="FULL NAME" icon={<User size={15} />}>
+          {/* INPUTS */}
+          {[
+            { key: "name", label: "Full Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "address", label: "Address" },
+          ].map((field) => (
+            <div key={field.key} className="relative">
               <input
-                className="input-modern pl-10"
                 type="text"
-                placeholder="Ishan E."
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={(form as any)[field.key]}
+                onChange={(e) =>
+                  setForm({ ...form, [field.key]: e.target.value })
+                }
+                onFocus={() => setFocused(field.key)}
+                onBlur={() => setFocused(null)}
+                className={`w-full px-4 pt-5 pb-2 rounded-xl bg-white/5 border transition-all text-white
+                ${
+                  focused === field.key
+                    ? "border-cyan-400 ring-2 ring-cyan-400/30"
+                    : "border-white/15"
+                }`}
               />
-            </Field>
 
-            <Field label="PHONE" icon={<Phone size={15} />}>
-              <input
-                className="input-modern pl-10"
-                type="tel"
-                placeholder="07XXXXXXXX"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              />
-            </Field>
+              <label
+                className={`absolute left-4 transition-all text-sm
+                ${
+                  focused === field.key ||
+                  (form as any)[field.key]
+                    ? "-top-2 text-xs text-cyan-400 bg-slate-950 px-1"
+                    : "top-3 text-slate-400"
+                }`}
+              >
+                {field.label}
+              </label>
+            </div>
+          ))}
+
+          {/* PASSWORD */}
+          <div className="relative">
+            <input
+              type={show ? "text" : "password"}
+              value={form.password}
+              onChange={(e) =>
+                setForm({ ...form, password: e.target.value })
+              }
+              onFocus={() => setFocused("password")}
+              onBlur={() => setFocused(null)}
+              className={`w-full px-4 pt-5 pb-2 rounded-xl bg-white/5 border text-white transition-all
+              ${
+                focused === "password"
+                  ? "border-cyan-400 ring-2 ring-cyan-400/30"
+                  : "border-white/15"
+              }`}
+            />
+
+            <label
+              className={`absolute left-4 transition-all text-sm
+              ${
+                focused === "password" || form.password
+                  ? "-top-2 text-xs text-cyan-400 bg-slate-950 px-1"
+                  : "top-3 text-slate-400"
+              }`}
+            >
+              Password
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+            >
+              {show ? <EyeOff /> : <Eye />}
+            </button>
           </div>
 
-          <Field label="EMAIL ADDRESS" icon={<Mail size={15} />}>
-            <input
-              className="input-modern pl-10"
-              type="email"
-              placeholder="example@mail.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </Field>
-
-          <Field label="DELIVERY ADDRESS" icon={<MapPin size={15} />} iconTop>
-            <textarea
-              className="input-modern pl-10 min-h-16 resize-none"
-              placeholder="Your location"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            />
-          </Field>
-
-          <Field label="PASSWORD" icon={<Lock size={15} />}>
-            <div className="relative">
-              <input
-                className="input-modern pl-10 pr-10"
-                type={showPassword ? "text" : "password"}
-                placeholder="Minimum 6 characters"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/45 hover:text-white/70"
-              >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </Field>
-
-          <button type="submit" className="btn-primary-modern w-full py-3 mt-1 flex items-center justify-center gap-2 disabled:opacity-60" disabled={isLoading}>
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <>Create Account <UserPlus size={16} /></>}
+          {/* BUTTON */}
+          <button
+            type="submit"
+            className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin mx-auto" />
+            ) : (
+              "Create Account"
+            )}
           </button>
+
+          <p className="text-sm text-slate-400 text-center">
+            Already have an account?{" "}
+            <Link href="/login" className="text-cyan-400">
+              Login
+            </Link>
+          </p>
+
         </form>
-
-        <p className="text-center text-sm text-white/45 mt-5">
-          Already have an account? {" "}
-          <Link href="/login" className="text-cyan-300 hover:text-cyan-200 font-semibold">
-            Login
-          </Link>
-        </p>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  icon,
-  iconTop,
-  children,
-}: {
-  label: string;
-  icon: ReactNode;
-  iconTop?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="relative">
-      <label className="text-[10px] text-white/45 mb-1 block font-semibold uppercase tracking-[0.05em]">{label}</label>
-      <div className={`absolute left-3 text-white/35 pointer-events-none ${iconTop ? "top-[2.15rem]" : "top-9 -translate-y-1/2"}`}>
-        {icon}
-      </div>
-      {children}
     </div>
   );
 }

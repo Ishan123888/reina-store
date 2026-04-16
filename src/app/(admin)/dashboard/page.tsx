@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
 
-// Types නිවැරදි කිරීම
 type OrderItem = {
   name: string;
   quantity: number;
@@ -25,7 +24,7 @@ type Order = {
   total_amount: number;
   status: string;
   created_at: string;
-  items: OrderItem[] | any; // JSON column එකක් නිසා any හෝ array විය හැක
+  items: OrderItem[];
 };
 
 export default function AdminDashboard() {
@@ -40,16 +39,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     async function load() {
-      setLoading(true);
       const supabase = getSupabaseBrowserClient();
 
       try {
-        // Promise.all පාවිච්චි කරලා එකපාර data ටික ගන්නවා
         const [productsRes, ordersRes, customerRes] = await Promise.all([
           supabase.from("products").select("id", { count: "exact", head: true }),
           supabase
             .from("orders")
-            .select("id,customer_name,total_amount,status,created_at,items")
+            .select("*")
             .order("created_at", { ascending: false }),
           supabase
             .from("profiles")
@@ -58,22 +55,23 @@ export default function AdminDashboard() {
         ]);
 
         const orderRows = (ordersRes.data as Order[]) || [];
-        
-        // Stats ගණනය කිරීම
-        const totalSales = orderRows.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-        const pendingOrders = orderRows.filter((o) => 
-          o.status?.toLowerCase() === "pending"
+
+        const totalSales = orderRows.reduce(
+          (sum, o) => sum + Number(o.total_amount || 0),
+          0
+        );
+
+        const pendingOrders = orderRows.filter(
+          (o) => o.status?.toLowerCase() === "pending"
         ).length;
 
-        setOrders(orderRows.slice(0, 8)); // අන්තිම order 8ක් පෙන්වීමට
+        setOrders(orderRows.slice(0, 6));
         setStats({
           totalSales,
           pendingOrders,
           totalProducts: productsRes.count || 0,
           totalCustomers: customerRes.count || 0,
         });
-      } catch (error) {
-        console.error("Dashboard data load error:", error);
       } finally {
         setLoading(false);
       }
@@ -84,121 +82,173 @@ export default function AdminDashboard() {
 
   const cards = useMemo(
     () => [
-      { 
-        label: "Total Sales", 
-        value: `Rs. ${stats.totalSales.toLocaleString()}`, 
-        icon: <ShoppingCart size={16} /> 
+      {
+        label: "Total Sales",
+        value: `Rs. ${stats.totalSales.toLocaleString()}`,
+        icon: <ShoppingCart size={18} />,
       },
-      { 
-        label: "Pending Orders", 
-        value: stats.pendingOrders.toString(), 
-        icon: <Package size={16} /> 
+      {
+        label: "Pending Orders",
+        value: stats.pendingOrders,
+        icon: <Package size={18} />,
       },
-      { 
-        label: "Products", 
-        value: stats.totalProducts.toString(), 
-        icon: <Boxes size={16} /> 
+      {
+        label: "Products",
+        value: stats.totalProducts,
+        icon: <Boxes size={18} />,
       },
-      { 
-        label: "Customers", 
-        value: stats.totalCustomers.toString(), 
-        icon: <Users size={16} /> 
+      {
+        label: "Customers",
+        value: stats.totalCustomers,
+        icon: <Users size={18} />,
       },
     ],
     [stats]
   );
 
+  const getStatusStyle = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "pending")
+      return "bg-yellow-400/10 text-yellow-300 border-yellow-400/20";
+    if (s === "completed")
+      return "bg-green-400/10 text-green-300 border-green-400/20";
+    if (s === "cancelled")
+      return "bg-red-400/10 text-red-300 border-red-400/20";
+    return "bg-white/10 text-white/60 border-white/20";
+  };
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="animate-spin text-cyan-300" size={36} />
+        <Loader2 className="animate-spin text-cyan-400" size={34} />
       </div>
     );
   }
 
   return (
-    <div className="glass-panel rounded-3xl p-8">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-7">
+    <div className="p-6 space-y-8">
+
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200/80 font-bold">Admin Overview</p>
-          <h1 className="text-4xl font-black uppercase italic tracking-tighter mt-2">Dashboard.</h1>
-          <p className="text-white/50 text-sm mt-2">Monitor orders, customer registrations, and inventory activity.</p>
+          <h1 className="text-2xl font-semibold text-white">
+            Dashboard
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Overview of sales, orders and customers
+          </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-3">
           <Link
             href="/add-product"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-cyan-500 text-slate-950 font-black uppercase tracking-widest text-[10px]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 text-white text-sm hover:bg-cyan-600 transition"
           >
-            <PlusCircle size={14} /> Add Slippers
+            <PlusCircle size={16} /> Add Product
           </Link>
+
           <Link
             href="/orders"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-white font-black uppercase tracking-widest text-[10px]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white text-sm hover:bg-white/5 transition"
           >
-            Manage Orders <ArrowRight size={14} />
+            Orders <ArrowRight size={16} />
           </Link>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        {cards.map((card) => (
-          <div key={card.label} className="glass-soft glass-hover rounded-2xl p-5">
-            <div className="w-9 h-9 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center text-cyan-300 mb-3">
-              {card.icon}
+      {/* STATS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((c) => (
+          <div
+            key={c.label}
+            className="rounded-2xl border border-white/10 bg-white/5 p-5 hover:bg-white/10 transition"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-cyan-400">{c.icon}</div>
             </div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/50 font-bold">{card.label}</p>
-            <p className="text-xl font-black mt-2">{card.value}</p>
+            <p className="text-sm text-slate-400">{c.label}</p>
+            <p className="text-xl font-semibold text-white mt-1">
+              {c.value}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Orders Table */}
-      <div className="glass-soft rounded-2xl overflow-x-auto">
-        <table className="min-w-190 w-full text-left">
-          <thead className="bg-white/5">
-            <tr className="text-[10px] uppercase tracking-[0.18em] text-white/50">
-              <th className="p-4 font-black">Order</th>
-              <th className="p-4 font-black">Customer</th>
-              <th className="p-4 font-black">Items</th>
-              <th className="p-4 font-black">Amount</th>
-              <th className="p-4 font-black">Status</th>
-              <th className="p-4 font-black">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
+      {/* TABLE */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/10 flex justify-between items-center">
+          <h2 className="text-sm font-medium text-white">
+            Recent Orders
+          </h2>
+          <Link
+            href="/orders"
+            className="text-sm text-cyan-400 flex items-center gap-1"
+          >
+            View all <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-slate-400 text-xs">
               <tr>
-                <td className="p-10 text-center text-white/50 font-bold" colSpan={6}>
-                  No orders available.
-                </td>
+                <th className="p-4 text-left">Order</th>
+                <th className="p-4 text-left">Customer</th>
+                <th className="p-4 text-left">Items</th>
+                <th className="p-4 text-left">Amount</th>
+                <th className="p-4 text-left">Status</th>
+                <th className="p-4 text-left">Date</th>
               </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="border-t border-white/10 hover:bg-white/5 transition-all">
-                  <td className="p-4 font-bold text-cyan-300">#{order.id.slice(0, 8).toUpperCase()}</td>
-                  <td className="p-4 font-bold text-white/80">{order.customer_name}</td>
-                  <td className="p-4 font-bold text-white/60 text-xs">
-                    {Array.isArray(order.items) 
-                      ? order.items.slice(0, 2).map((item: any) => `${item.quantity}x ${item.name}`).join(", ") 
-                      : "No items"}
+            </thead>
+
+            <tbody>
+              {orders.map((o) => (
+                <tr
+                  key={o.id}
+                  className="border-t border-white/10 hover:bg-white/5 transition"
+                >
+                  <td className="p-4 text-cyan-400 font-medium">
+                    #{o.id.slice(0, 6)}
                   </td>
-                  <td className="p-4 font-black">Rs. {Number(order.total_amount || 0).toLocaleString()}</td>
+
+                  <td className="p-4 text-white">
+                    {o.customer_name}
+                  </td>
+
+                  <td className="p-4 text-slate-400 text-xs">
+                    {Array.isArray(o.items)
+                      ? o.items
+                          .slice(0, 2)
+                          .map(
+                            (item) =>
+                              `${item.quantity}x ${item.name}`
+                          )
+                          .join(", ")
+                      : "-"}
+                  </td>
+
+                  <td className="p-4 text-white font-medium">
+                    Rs. {Number(o.total_amount).toLocaleString()}
+                  </td>
+
                   <td className="p-4">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-white/10 border border-white/15">
-                      {order.status}
+                    <span
+                      className={`px-3 py-1 text-xs rounded-full border ${getStatusStyle(
+                        o.status
+                      )}`}
+                    >
+                      {o.status}
                     </span>
                   </td>
-                  <td className="p-4 text-white/60 font-bold text-xs">
-                    {new Date(order.created_at).toLocaleDateString()}
+
+                  <td className="p-4 text-slate-400 text-xs">
+                    {new Date(o.created_at).toLocaleDateString()}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
