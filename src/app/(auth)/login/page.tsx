@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, Sparkles, LogIn, AlertCircle } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+import { useSearchParams, useRouter } from "next/navigation";
 
-export default function LoginPage() {
+function LoginPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -13,129 +16,182 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   const validateForm = () => {
     if (!email || !password) return "Please fill in all fields.";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return "Please enter a valid email address.";
+    if (!emailRegex.test(email.trim())) return "Please enter a valid email address.";
     return null;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationError = validateForm();
-    if (validationError) { setError(validationError); return; }
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Authenticate User
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password 
+      // 1. Auth Login
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
 
       if (authError) {
-        setError(authError.message === "Invalid login credentials" ? "Incorrect email or password." : authError.message);
+        setLoading(false);
+        setError(
+          authError.message === "Invalid login credentials"
+            ? "No account found or password is incorrect."
+            : authError.message
+        );
+        return;
+      }
+
+      if (!authData?.user) {
         setLoading(false);
         return;
       }
 
-      if (authData?.user) {
-        // 2. Fetch Profile to check Role
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", authData.user.id)
-          .maybeSingle(); // error එකක් දෙන්නේ නැතුව null දෙනවා profile එක නැත්නම්
+      // 2. Fetch User Profile & Role
+      // මෙතනදී අපි 'maybeSingle' පාවිච්චි කරන්නේ පේළියක් නැති වුණොත් error එකක් නොවී null ලැබෙන්නයි.
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single(); 
 
-        if (profileError) {
-          throw new Error("Error fetching user profile.");
-        }
-
-        if (!profile) {
-          // Profile එකක් නැත්නම් session එක අයින් කරලා error එකක් පෙන්වනවා
-          await supabase.auth.signOut();
-          setError("User profile not found. Please contact support.");
-          setLoading(false);
-          return;
-        }
-
-        // 3. Optimized Redirect Logic
-        const targetRoute = profile.role === "admin" ? "/dashboard" : "/collections";
-        window.location.href = targetRoute;
+      if (profileError) {
+        console.error("Database Error:", profileError);
+        // RLS Policy එක නැති වුණොත් හෝ Table එකේ row එක නැති වුණොත් මෙතනට එනවා
+        setError("Permission denied or Profile not found. Please check Supabase RLS.");
+        setLoading(false);
+        return;
       }
+
+      // 3. Redirect Logic
+      const isAdmin = (profile?.role || "").toLowerCase() === "admin";
+      const requestedRoute = searchParams.get("next");
+      
+      let targetRoute = isAdmin ? "/dashboard" : "/customer-dashboard";
+
+      // පරණ route එකක් තිබුණොත් ඒකට යවනවා
+      if (requestedRoute && requestedRoute.startsWith("/") && !requestedRoute.startsWith("//")) {
+        targetRoute = requestedRoute;
+      }
+
+      console.log("Login Success. Redirecting to:", targetRoute);
+      
+      // Next.js router එක සමහර වෙලාවට session එක update කරගන්න පරක්කු වෙන නිසා 
+      // window.location පාවිච්චි කිරීම වඩාත් විශ්වාසදායකයි
+      window.location.href = targetRoute;
+      
     } catch (err: any) {
-      console.error("Login Error:", err);
-      setError("An unexpected error occurred. Please try again.");
-      setLoading(false); // මෙතනදී loading එක false කරන එක අනිවාර්යයි
+      setError(err.message || "An unexpected error occurred.");
+      setLoading(false);
     }
   };
 
   if (!mounted) return null;
 
   return (
-    <div style={{
-      minHeight: "100vh", backgroundColor: "#020408", display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "20px", fontFamily: "'Inter', sans-serif",
-      backgroundImage: `radial-gradient(circle at 50% -20%, #111827, transparent), radial-gradient(circle at 0% 100%, #030712, transparent)`
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@700;800&display=swap');
-        .glass-card { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .input-field { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; width: 100%; padding: 12px 14px; border-radius: 10px; font-size: 14px; outline: none; transition: 0.2s; box-sizing: border-box; }
-        .input-field:focus { border-color: #22d3ee; background: rgba(34, 211, 238, 0.05); box-shadow: 0 0 0 1px #22d3ee; }
-        .btn-main { background: #fff; color: #000; width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-main:hover:not(:disabled) { background: #22d3ee; transform: translateY(-1px); }
-        .btn-main:disabled { opacity: 0.6; cursor: not-allowed; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-
-      <div className="glass-card" style={{ width: "100%", maxWidth: "380px", padding: "32px" }}>
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ width: 44, height: 44, background: "rgba(34, 211, 238, 0.1)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-            <Sparkles size={20} style={{ color: "#22d3ee" }} />
+    <div className="app-surface min-h-screen flex items-center justify-center p-5">
+      <div className="glass-panel w-full max-w-[24rem] p-8 rounded-[1.25rem]">
+        <div className="text-center mb-7">
+          <div className="w-11 h-11 rounded-xl bg-cyan-400/10 flex items-center justify-center mx-auto mb-4 border border-cyan-300/15">
+            <Sparkles size={20} className="text-cyan-400" />
           </div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "1.5rem", color: "#fff", margin: 0 }}>Welcome Back</h2>
-          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "4px" }}>Sign in to continue to Reina</p>
+          <h2 className="section-title text-2xl text-white italic font-black uppercase tracking-tighter">Welcome Back</h2>
+          <p className="text-xs text-white/45 mt-1 font-medium">Sign in to continue to Reina</p>
         </div>
 
         {error && (
-          <div style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", padding: "10px 12px", borderRadius: 8, fontSize: "12px", display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
-            <AlertCircle size={14} /> {error}
+          <div className="mb-5 rounded-lg border border-red-400/25 bg-red-500/10 text-red-300 text-[11px] px-3 py-2 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+            <AlertCircle size={14} className="shrink-0" /> 
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+        <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
-            <label style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", marginBottom: "6px", display: "block", fontWeight: 600, letterSpacing: "0.05em" }}>EMAIL</label>
-            <input className="input-field" type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
+            <label className="text-[10px] text-white/60 mb-1.5 block font-black tracking-widest uppercase">Email Address</label>
+            <input
+              className="input-modern"
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
+
           <div>
-            <label style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", marginBottom: "6px", display: "block", fontWeight: 600, letterSpacing: "0.05em" }}>PASSWORD</label>
-            <div style={{ position: "relative" }}>
-              <input className="input-field" type={showPassword ? "text" : "password"} placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer" }}>
+            <label className="text-[10px] text-white/60 mb-1.5 block font-black tracking-widest uppercase">Password</label>
+            <div className="relative">
+              <input
+                className="input-modern pr-10"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/45 hover:text-white/70 transition-colors"
+              >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
-          <button type="submit" className="btn-main" disabled={loading} style={{ marginTop: "4px" }}>
-            {loading ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <>Sign In <LogIn size={16} /></>}
+
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="btn-primary-modern w-full py-3 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.98]"
+          >
+            {loading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <>
+                <span className="font-black uppercase tracking-widest text-[11px]">Sign In Now</span>
+                <LogIn size={16} />
+              </>
+            )}
           </button>
         </form>
 
-        <p style={{ textAlign: "center", fontSize: "13px", color: "rgba(255,255,255,0.4)", marginTop: "24px" }}>
-          New to Reina? <Link href="/register" style={{ color: "#22d3ee", textDecoration: "none", fontWeight: 600 }}>Create account</Link>
+        <p className="text-center text-xs text-white/45 mt-8 font-medium">
+          New to Reina Store? {" "}
+          <Link href="/register" className="text-cyan-400 hover:underline decoration-cyan-400/30 underline-offset-4 transition-all">
+            Create account
+          </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="app-surface min-h-screen flex items-center justify-center">
+          <Loader2 size={34} className="animate-spin text-cyan-300" />
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

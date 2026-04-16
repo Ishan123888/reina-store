@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
-import { Loader2, Search, Users } from "lucide-react";
+import { Loader2, Search, Users, LogOut, ShoppingBag, CreditCard, CheckCircle, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type CustomerRow = {
   id: string;
@@ -13,52 +14,44 @@ type CustomerRow = {
   created_at?: string | null;
 };
 
-export default function AdminCustomersPage() {
+export default function CustomerDashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<CustomerRow[]>([]);
-  const [query, setQuery] = useState("");
+  const [profile, setProfile] = useState<CustomerRow | null>(null);
+  
+  const supabase = getSupabaseBrowserClient();
+
+  // Sign Out Function
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      // '/login' එකට redirect කරනවා. window.location පාවිච්චි කරන්නේ session එක සම්පූර්ණයෙන්ම clear වෙන්නයි.
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   useEffect(() => {
-    async function load() {
+    async function loadProfile() {
       setLoading(true);
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id,email,full_name,phone,address,created_at,role")
-        .eq("role", "customer")
-        .order("created_at", { ascending: false });
-
-      if (!error) {
-        setRows((data as any[])?.map((r) => ({
-          id: r.id,
-          email: r.email,
-          full_name: r.full_name,
-          phone: r.phone,
-          address: r.address,
-          created_at: r.created_at,
-        })) || []);
-      } else {
-        // fallback for older schemas (profiles without extra columns)
-        const { data: data2 } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data, error } = await supabase
           .from("profiles")
-          .select("id,email,created_at,role")
-          .eq("role", "customer")
-          .order("created_at", { ascending: false });
-        setRows((data2 as any[])?.map((r) => ({ id: r.id, email: r.email, created_at: r.created_at })) || []);
-      }
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
+        if (!error && data) {
+          setProfile(data);
+        }
+      }
       setLoading(false);
     }
-    load();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      [r.email, r.full_name, r.phone, r.address, r.id].some((v) => String(v || "").toLowerCase().includes(q))
-    );
-  }, [rows, query]);
+    loadProfile();
+  }, [supabase]);
 
   if (loading) {
     return (
@@ -69,64 +62,114 @@ export default function AdminCustomersPage() {
   }
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
-            <Users className="text-pink-300" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black uppercase italic tracking-tighter">Customers.</h1>
-            <p className="text-white/50 font-bold text-xs uppercase tracking-widest">
-              Registered customer list
-            </p>
-          </div>
+    <div className="space-y-8">
+      {/* Top Header with Sign Out Button */}
+      <div className="flex justify-between items-center bg-white/5 p-6 rounded-3xl border border-white/10 glass-panel">
+        <div>
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter text-white">
+            My <span className="text-pink-400">Dashboard.</span>
+          </h1>
+          <p className="text-white/40 font-bold text-xs uppercase tracking-widest mt-1">
+            Manage your account & orders
+          </p>
         </div>
 
-        <div className="relative w-full md:w-90">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={16} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name / email / phone"
-            className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none text-white placeholder:text-white/40 font-bold text-sm"
-          />
-        </div>
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 font-black uppercase tracking-widest text-[10px] hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-lg shadow-red-500/5"
+        >
+          <LogOut size={14} /> Sign Out
+        </button>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-white/60 font-bold">
-          No customers found.
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Stats & Profile */}
+        <div className="lg:col-span-1 space-y-8">
+          {/* Stats Card */}
+          <div className="glass-panel rounded-3xl p-8 border border-white/10">
+            <div className="flex items-center gap-3 mb-6">
+              <ShoppingBag className="text-pink-400" size={20} />
+              <h2 className="text-lg font-black uppercase italic text-white">Quick Stats</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                <p className="text-white/40 text-[10px] font-bold uppercase mb-1">Orders</p>
+                <p className="text-2xl font-black text-white">0</p>
+              </div>
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                <p className="text-white/40 text-[10px] font-bold uppercase mb-1">Delivered</p>
+                <p className="text-2xl font-black text-pink-400">0</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Details Card with integrated Sign Out */}
+          <div className="glass-panel rounded-3xl p-8 border border-white/10">
+            <div className="flex items-center gap-3 mb-6">
+              <User className="text-pink-400" size={20} />
+              <h2 className="text-lg font-black uppercase italic text-white">Profile info</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-1">Full Name</p>
+                <p className="text-white font-bold">{profile?.full_name || "Not set"}</p>
+              </div>
+              <div>
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-1">Email</p>
+                <p className="text-white/70 font-medium text-sm">{profile?.email}</p>
+              </div>
+              <div>
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-1">Phone</p>
+                <p className="text-white/70 font-medium text-sm">{profile?.phone || "—"}</p>
+              </div>
+              <div className="pb-4 border-b border-white/5">
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-1">Address</p>
+                <p className="text-white/70 font-medium text-sm leading-relaxed truncate">{profile?.address || "—"}</p>
+              </div>
+              
+              {/* Optional: Second Sign Out placement inside Profile */}
+              <div className="pt-2 flex flex-col gap-2">
+                 <button 
+                  onClick={() => router.push('/shop')}
+                  className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-xs uppercase hover:bg-white/10 transition-all"
+                 >
+                  Edit Profile
+                 </button>
+              </div>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="min-w-225 w-full text-left">
-            <thead className="bg-white/5">
-              <tr className="text-[10px] uppercase tracking-widest text-white/50">
-                <th className="p-4 font-black">Name</th>
-                <th className="p-4 font-black">Email</th>
-                <th className="p-4 font-black">Phone</th>
-                <th className="p-4 font-black">Address</th>
-                <th className="p-4 font-black">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-t border-white/10 hover:bg-white/5 transition-all">
-                  <td className="p-4 font-black text-white/90">{r.full_name || "—"}</td>
-                  <td className="p-4 font-bold text-white/70">{r.email || "—"}</td>
-                  <td className="p-4 font-bold text-white/70">{r.phone || "—"}</td>
-                  <td className="p-4 font-bold text-white/70 max-w-90 truncate">{r.address || "—"}</td>
-                  <td className="p-4 font-bold text-white/50">
-                    {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Right Column: Order History */}
+        <div className="lg:col-span-2">
+          <div className="glass-panel rounded-3xl p-8 border border-white/10 min-h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <CreditCard className="text-pink-400" size={20} />
+                <h2 className="text-lg font-black uppercase italic text-white">Order History</h2>
+              </div>
+              <span className="bg-pink-500/10 text-pink-400 text-[10px] font-black px-3 py-1 rounded-full border border-pink-500/20 uppercase tracking-widest">
+                Recent Activity
+              </span>
+            </div>
+
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/2">
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                <ShoppingBag className="text-white/20" size={30} />
+              </div>
+              <p className="text-white/40 font-bold text-sm uppercase tracking-widest mb-2">No orders found</p>
+              <p className="text-white/20 text-xs font-medium">Your recent purchases will appear here.</p>
+              <button 
+                onClick={() => router.push('/shop')}
+                className="mt-6 px-8 py-3 bg-pink-500 text-white font-black uppercase italic tracking-tighter rounded-2xl hover:bg-pink-600 transition-all active:scale-95"
+              >
+                Start Shopping
+              </button>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
-

@@ -1,9 +1,20 @@
 import { getSupabaseServerClient } from "@/core/configs/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await getSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Login required to view products" },
+        { status: 401 }
+      );
+    }
+
     const { data, error } = await supabase.from("products").select("*");
 
     if (error) throw error;

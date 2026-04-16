@@ -1,232 +1,427 @@
 "use client";
 
-import { Search, Truck, Loader2, CheckCircle2, Clock, Package, MapPin, ChevronRight, Hash } from "lucide-react";
-import { useEffect, useState, Suspense } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import type { ComponentType } from "react";
 import { useSearchParams } from "next/navigation";
+import {
+  Clock,
+  Hash,
+  Loader2,
+  MapPin,
+  Package,
+  Search,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+
+type OrderItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  size?: string;
+  color?: string;
+};
+
+type Order = {
+  id: string;
+  customer_name: string;
+  address: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  items: OrderItem[];
+};
+
+const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
 
 function TrackOrderContent() {
   const searchParams = useSearchParams();
-  const initial = searchParams.get("orderId") || "";
-  const [orderId, setOrderId] = useState(initial);
+  const initialOrderId = searchParams.get("orderId") || "";
+
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState(initialOrderId);
   const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<any>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
+  useEffect(() => {
+    async function init() {
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const fetchOrder = async (id: string) => {
-    setError(null);
-    setOrder(null);
-    if (!id.trim()) {
-      setError("Please enter a valid Order ID.");
+      if (!user) {
+        setAuthLoading(false);
+        return;
+      }
+
+      setUserId(user.id);
+
+      const { data } = await supabase
+        .from("orders")
+        .select("id,customer_name,address,status,total_amount,created_at,items")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(12);
+
+      const rows = (data as Order[]) || [];
+      setOrders(rows);
+      setAuthLoading(false);
+
+      if (initialOrderId) {
+        const matched = rows.find((o) => o.id === initialOrderId);
+        if (matched) {
+          setOrder(matched);
+        } else {
+          findOrder(initialOrderId, user.id);
+        }
+      }
+    }
+
+    init();
+  }, [initialOrderId]);
+
+  async function findOrder(id: string, uid = userId) {
+    if (!uid) return;
+
+    const cleanId = id.trim();
+    if (!cleanId) {
+      setError("Please enter a valid order ID.");
       return;
     }
+
     setLoading(true);
+    setError(null);
+    setOrder(null);
+
     try {
       const supabase = getSupabaseBrowserClient();
-      const { data, error: e } = await supabase.from("orders").select("*").eq("id", id.trim()).single();
-      if (e) throw e;
-      setOrder(data || null);
+      const { data, error: findError } = await supabase
+        .from("orders")
+        .select("id,customer_name,address,status,total_amount,created_at,items")
+        .eq("id", cleanId)
+        .eq("user_id", uid)
+        .single();
+
+      if (findError || !data) throw new Error("not_found");
+      setOrder(data as Order);
     } catch {
-      setError("We couldn't find an order with that ID. Please try again.");
+      setError("No order found for this account with that ID.");
     } finally {
       setLoading(false);
     }
+  }
+
+  const statusConfig: Record<string, { color: string; bg: string; icon: ComponentType<{ size?: number }> }> = {
+    Pending: { color: "#fbbf24", bg: "rgba(251,191,36,0.12)", icon: Clock },
+    Processing: { color: "#22d3ee", bg: "rgba(34,211,238,0.12)", icon: Package },
+    Shipped: { color: "#818cf8", bg: "rgba(129,140,248,0.12)", icon: Truck },
+    Delivered: { color: "#34d399", bg: "rgba(52,211,153,0.12)", icon: ShieldCheck },
+    Cancelled: { color: "#f87171", bg: "rgba(248,113,113,0.12)", icon: Clock },
   };
 
-  useEffect(() => {
-    if (initial) fetchOrder(initial);
-  }, [initial]);
+  const statusTone = useMemo(
+    () => (order ? statusConfig[order.status] || statusConfig.Pending : statusConfig.Pending),
+    [order]
+  );
 
-  const statusConfig: Record<string, { color: string; bg: string; icon: any }> = {
-    Pending: { color: "#fbbf24", bg: "rgba(251,191,36,0.1)", icon: Clock },
-    Processing: { color: "#22d3ee", bg: "rgba(34,211,238,0.1)", icon: Package },
-    Shipped: { color: "#818cf8", bg: "rgba(129,140,248,0.1)", icon: Truck },
-    Delivered: { color: "#34d399", bg: "rgba(52,211,153,0.1)", icon: CheckCircle2 },
-    Cancelled: { color: "#f87171", bg: "rgba(248,113,113,0.1)", icon: Clock },
-  };
-  const sc = statusConfig[order?.status] || statusConfig.Pending;
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#020408" }}>
+        <Loader2 size={34} className="animate-spin" style={{ color: "#22d3ee" }} />
+      </div>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          backgroundColor: "#020408",
+          backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.88), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 420,
+            width: "100%",
+            borderRadius: 22,
+            padding: 30,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(18px)",
+            textAlign: "center",
+            color: "#fff",
+          }}
+        >
+          <h2 style={{ margin: "0 0 10px", fontFamily: "'Syne', sans-serif" }}>Login Required</h2>
+          <p style={{ margin: "0 0 20px", color: "rgba(255,255,255,0.55)", fontSize: 13 }}>
+            Please sign in to track your own orders.
+          </p>
+          <div style={{ display: "grid", gap: 10 }}>
+            <Link
+              href="/login"
+              style={{
+                textDecoration: "none",
+                color: "#020408",
+                background: "#22d3ee",
+                borderRadius: 10,
+                padding: "12px 14px",
+                fontWeight: 700,
+                fontSize: 12,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Login
+            </Link>
+            <Link
+              href="/register"
+              style={{
+                textDecoration: "none",
+                color: "#fff",
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 10,
+                padding: "12px 14px",
+                fontWeight: 700,
+                fontSize: 12,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "#020408",
-      backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.92), rgba(2, 4, 8, 0.96)), url("${bgImageUrl}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-      color: "#f8fafc",
-      fontFamily: "'Inter', sans-serif",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "60px 24px",
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#020408",
+        backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.9), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+        color: "#f8fafc",
+        fontFamily: "'Inter', sans-serif",
+        display: "grid",
+        placeItems: "center",
+        padding: "40px 20px",
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@600;700&display=swap');
-        
         .glass-card {
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 20px;
-          padding: 32px;
-          width: 100%;
-          max-width: 500px;
-          box-shadow: 0 40px 100px rgba(0,0,0,0.4);
-        }
-
-        .input-group {
-          position: relative;
-          display: flex;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(255, 255, 255, 0.04);
+          backdrop-filter: blur(22px);
           border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          overflow: hidden;
-          transition: all 0.3s ease;
-        }
-
-        .input-group:focus-within {
-          border-color: #22d3ee;
-          background: rgba(255, 255, 255, 0.08);
-        }
-
-        .track-input {
-          background: transparent;
-          border: none;
-          color: #fff;
-          padding: 14px 18px;
+          border-radius: 24px;
           width: 100%;
-          font-size: 14px;
-          outline: none;
-        }
-
-        .search-btn {
-          background: #22d3ee;
-          color: #020408;
-          border: none;
-          padding: 0 20px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .search-btn:hover {
-          background: #fff;
-        }
-
-        .info-label {
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 1.5px;
-          color: rgba(255, 255, 255, 0.4);
-          margin-bottom: 6px;
-          font-weight: 500;
-        }
-
-        .info-value {
-          font-size: 15px;
-          color: #fff;
-          font-weight: 400;
-        }
-
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 14px;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 500;
+          max-width: 680px;
+          padding: 26px;
         }
       `}</style>
 
       <div className="glass-card">
-        {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ 
-            width: 50, height: 50, borderRadius: "12px", 
-            background: "rgba(34, 211, 238, 0.1)", 
-            display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 16px", color: "#22d3ee"
-          }}>
-            <Truck size={24} />
-          </div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, marginBottom: 8 }}>Track Order</h2>
-          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>Enter your ID to see delivery updates</p>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ margin: 0, fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(34,211,238,0.7)", fontWeight: 700 }}>
+            My Order Tracking
+          </p>
+          <h2 style={{ margin: "10px 0 6px", fontFamily: "'Syne', sans-serif", fontSize: "clamp(1.5rem,4vw,2rem)" }}>
+            Track your orders
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.52)" }}>
+            Only orders from your logged-in account are visible.
+          </p>
         </div>
 
-        {/* Search Box */}
-        <div style={{ marginBottom: 32 }}>
-          <div className="input-group">
-            <input 
-              className="track-input" 
-              placeholder="Order ID (e.g. 1234-5678)"
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchOrder(orderId)}
-            />
-            <button className="search-btn" onClick={() => fetchOrder(orderId)}>
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+        <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12,
+                padding: "0 12px",
+              }}
+            >
+              <Hash size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+              <input
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && findOrder(orderId)}
+                placeholder="Enter your order ID"
+                style={{
+                  width: "100%",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: "#fff",
+                  height: 44,
+                  fontSize: 13,
+                }}
+              />
+            </div>
+            <button
+              onClick={() => findOrder(orderId)}
+              style={{
+                border: "none",
+                borderRadius: 12,
+                background: "#22d3ee",
+                color: "#020408",
+                width: 48,
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+              }}
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             </button>
           </div>
-          {error && <p style={{ color: "#f87171", fontSize: 12, marginTop: 10, textAlign: "center" }}>{error}</p>}
+
+          {orders.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+              {orders.slice(0, 6).map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => {
+                    setOrderId(o.id);
+                    setOrder(o);
+                    setError(null);
+                  }}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "rgba(255,255,255,0.75)",
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  #{o.id.slice(0, 8).toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {error && <p style={{ margin: 0, color: "#fca5a5", fontSize: 12 }}>{error}</p>}
         </div>
 
-        {/* Result Content */}
         {order ? (
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 32 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
-                <p className="info-label">Current Status</p>
-                <div className="status-badge" style={{ backgroundColor: sc.bg, color: sc.color }}>
-                  <sc.icon size={14} />
-                  {order.status}
-                </div>
+                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>Order #{order.id.slice(0, 8).toUpperCase()}</p>
+                <p style={{ margin: "5px 0 0", fontSize: 13, color: "rgba(255,255,255,0.65)" }}>
+                  {new Date(order.created_at).toLocaleString()}
+                </p>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <p className="info-label">Total Amount</p>
-                <p style={{ fontSize: 18, fontWeight: 600, color: "#22d3ee" }}>Rs. {order.total_amount?.toLocaleString()}</p>
+
+              <span
+                style={{
+                  background: statusTone.bg,
+                  color: statusTone.color,
+                  borderRadius: 999,
+                  padding: "7px 12px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  height: "fit-content",
+                }}
+              >
+                {order.status}
+              </span>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Shipping Address
+              </p>
+              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                <MapPin size={14} style={{ color: "#22d3ee", marginTop: 2 }} />
+                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.72)" }}>{order.address}</p>
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 20 }}>
-              <div style={{ background: "rgba(255,255,255,0.02)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
-                <p className="info-label">Tracking Number</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.8)" }}>
-                  <Hash size={14} style={{ color: "#22d3ee" }} />
-                  <span style={{ fontSize: 13, fontFamily: "monospace" }}>{order.id}</span>
+            <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+              {(order.items || []).map((item, idx) => (
+                <div
+                  key={`${order.id}-${idx}`}
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 10,
+                    padding: "9px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{item.quantity}x {item.name}</p>
+                    <p style={{ margin: "3px 0 0", fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
+                      {item.color || "-"} {item.size ? `| Size ${item.size}` : ""}
+                    </p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: "#22d3ee", fontWeight: 700 }}>
+                    Rs. {(item.price * item.quantity).toLocaleString()}
+                  </p>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div>
-                  <p className="info-label">Customer</p>
-                  <p className="info-value">{order.customer_name}</p>
-                </div>
-                <div>
-                  <p className="info-label">Date</p>
-                  <p className="info-value">{order.created_at ? new Date(order.created_at).toLocaleDateString() : "-"}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="info-label">Shipping Address</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <MapPin size={14} style={{ color: "#22d3ee", marginTop: 3, flexShrink: 0 }} />
-                  <p className="info-value" style={{ fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,0.7)" }}>{order.address}</p>
-                </div>
-              </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                Total: <span style={{ color: "#22d3ee" }}>Rs. {Number(order.total_amount || 0).toLocaleString()}</span>
+              </p>
+              <Link
+                href={`/customer-dashboard`}
+                style={{
+                  color: "rgba(255,255,255,0.65)",
+                  textDecoration: "none",
+                  fontSize: 12,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 9,
+                  padding: "8px 10px",
+                }}
+              >
+                Back to Dashboard
+              </Link>
             </div>
           </div>
         ) : (
-          !loading && !error && (
-            <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(255,255,255,0.2)" }}>
-              <Package size={40} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
-              <p style={{ fontSize: 13 }}>Waiting for Order ID...</p>
+          !loading && (
+            <div
+              style={{
+                borderTop: "1px solid rgba(255,255,255,0.1)",
+                paddingTop: 18,
+                color: "rgba(255,255,255,0.42)",
+                fontSize: 13,
+              }}
+            >
+              Select an order chip above or search by exact order ID.
             </div>
           )
         )}
@@ -237,11 +432,13 @@ function TrackOrderContent() {
 
 export default function TrackOrder() {
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: "100vh", backgroundColor: "#020408", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Loader2 size={30} className="animate-spin" style={{ color: "#22d3ee" }} />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#020408" }}>
+          <Loader2 size={32} className="animate-spin" style={{ color: "#22d3ee" }} />
+        </div>
+      }
+    >
       <TrackOrderContent />
     </Suspense>
   );

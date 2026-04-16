@@ -10,6 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
 
   useEffect(() => {
     async function guard() {
@@ -65,7 +66,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="min-h-screen bg-[#0d0010] text-white font-sans">
+    <div
+      className="min-h-screen text-white font-sans"
+      style={{
+        backgroundColor: "#020408",
+        backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.9), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+      }}
+    >
       <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
         <aside className="lg:col-span-3 bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl h-fit sticky top-6">
           <div className="flex items-center justify-between mb-6">

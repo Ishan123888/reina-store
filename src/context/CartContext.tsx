@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
 
 export interface CartItem {
   line_id: string;
@@ -27,23 +28,49 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("reina_cart");
+    const supabase = getSupabaseBrowserClient();
+
+    const applyUserKey = (userId?: string) => {
+      setStorageKey(userId ? `reina_cart_${userId}` : "reina_cart_guest");
+    };
+
+    supabase.auth.getUser().then(({ data }) => applyUserKey(data.user?.id));
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      applyUserKey(session?.user?.id);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!storageKey) return;
+
+    setIsInitialized(false);
+    const savedCart = localStorage.getItem(storageKey);
     if (savedCart) {
       try {
         setCart(JSON.parse(savedCart));
       } catch {
-        // ignore invalid localStorage
+        setCart([]);
       }
+    } else {
+      setCart([]);
     }
     setIsInitialized(true);
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (isInitialized) localStorage.setItem("reina_cart", JSON.stringify(cart));
-  }, [cart, isInitialized]);
+    if (isInitialized && storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify(cart));
+    }
+  }, [cart, isInitialized, storageKey]);
 
   const addToCart = (product: any, options?: { color?: string; size?: string }) => {
     const color = options?.color ?? product.selectedColor ?? product.color ?? undefined;

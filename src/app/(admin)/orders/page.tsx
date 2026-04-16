@@ -43,9 +43,10 @@ export default function AdminOrdersPage() {
     setDownloadingInvoice(orderId);
     try {
       const response = await fetch(`/api/invoices/${orderId}`);
-      const data = await response.json();
+      if (!response.ok) throw new Error("Invoice generation failed");
+      const html = await response.text();
       
-      const blob = new Blob([data.html], { type: "text/html;charset=utf-8" });
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement("a");

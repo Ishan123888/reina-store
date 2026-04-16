@@ -37,7 +37,7 @@ export default function AdminInvoicePage() {
 
   if (!order) {
     return (
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-white/70">
+      <div className="glass-panel rounded-3xl p-8 text-white/70">
         <p className="font-black uppercase tracking-widest text-xs">Invoice not found.</p>
         <Link href="/orders" className="inline-flex items-center gap-2 mt-6 text-pink-300 font-black uppercase tracking-widest text-[10px]">
           <ArrowLeft size={14} /> Back to Orders
@@ -47,7 +47,7 @@ export default function AdminInvoicePage() {
   }
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
+    <div className="glass-panel rounded-3xl p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:hidden">
         <Link href="/orders" className="inline-flex items-center gap-2 text-white/70 hover:text-white font-black uppercase tracking-widest text-[10px]">
           <ArrowLeft size={14} /> Back to Orders
@@ -89,7 +89,7 @@ export default function AdminInvoicePage() {
         </div>
 
         <div className="mt-8 overflow-x-auto border rounded-2xl">
-          <table className="min-w-[720px] w-full text-left">
+          <table className="min-w-180 w-full text-left">
             <thead className="bg-gray-50">
               <tr className="text-[10px] uppercase tracking-widest text-gray-500">
                 <th className="p-4 font-black">Item</th>
@@ -116,7 +116,7 @@ export default function AdminInvoicePage() {
         </div>
 
         <div className="mt-8 flex justify-end">
-          <div className="w-full sm:w-[360px] space-y-2">
+          <div className="w-full sm:w-90 space-y-2">
             <div className="flex justify-between text-gray-600 font-bold text-sm">
               <span>Subtotal</span>
               <span>Rs. {subtotal.toLocaleString()}</span>
@@ -139,4 +139,6 @@ export default function AdminInvoicePage() {
     </div>
   );
 }
+
+
 

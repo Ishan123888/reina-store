@@ -1,83 +1,108 @@
-﻿import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+const ADMIN_PREFIXES = ["/dashboard", "/add-product", "/orders", "/customers"];
+const CUSTOMER_ONLY_PREFIXES = ["/customer-dashboard"];
+const AUTH_REQUIRED_PREFIXES = [
+  "/collections",
+  "/product",
+  "/cart",
+  "/checkout",
+  "/track-order",
+  "/order-success",
+];
+
+function matchesPrefix(pathname: string, prefixes: string[]) {
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+function redirectToLogin(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.searchParams.set("next", request.nextUrl.pathname);
+  return NextResponse.redirect(url);
+}
 
 export default async function proxy(request: NextRequest) {
-  const url = request.nextUrl.clone()
-  const pathname = url.pathname
+  const pathname = request.nextUrl.pathname;
 
-  // 1. Static/API routes skip කිරීම (Performance සඳහා)
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.') ||
-    pathname === '/favicon.ico'
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.includes(".") ||
+    pathname === "/favicon.ico"
   ) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  let response = NextResponse.next({ request: { headers: request.headers } })
-
+  let response = NextResponse.next({ request: { headers: request.headers } });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
-          )
+          );
         },
       },
     }
-  )
+  );
 
-  // User session එක ලබා ගැනීම
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData.user;
 
-  // ✅ RULE: Admin pages protect කිරීම පමණයි
-  const isAdminPath = 
-    pathname.startsWith('/dashboard') || 
-    pathname.startsWith('/add-product') || 
-    pathname.startsWith('/orders')
+  const needsAdmin = matchesPrefix(pathname, ADMIN_PREFIXES);
+  const needsCustomer = matchesPrefix(pathname, CUSTOMER_ONLY_PREFIXES);
+  const needsAuth =
+    needsAdmin || needsCustomer || matchesPrefix(pathname, AUTH_REQUIRED_PREFIXES);
+  const isAuthPage = pathname === "/login" || pathname === "/register";
 
-  if (isAdminPath) {
-    // 1. User ලොග් වෙලා නැතිනම් /login පේජ් එකට යවන්න
-    if (!user) {
-      console.log('[PROXY] No user → Redirecting to /login')
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    try {
-      // 2. Profiles table එකෙන් Role එක ලබා ගැනීම
-      // .single() පාවිච්චි කරද්දී දත්ත නැති වුණොත් හිර නොවෙන්නයි මෙතැන try-catch දාලා තියෙන්නේ
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle() // මෙතැන maybeSingle පාවිච්චි කිරීම වඩාත් සුදුසුයි loading හිර නොවෙන්න
-
-      const isAdmin = profile?.role === 'admin'
-      console.log(`[PROXY] Path: ${pathname} | User: ${user.email} | Role: ${profile?.role} | isAdmin: ${isAdmin}`)
-
-      // 3. Admin කෙනෙක් නෙවෙයි නම් Dashboard එකට යන්න නොදී /collections වලට යවන්න
-      if (error || !isAdmin) {
-        console.log('[PROXY] Not admin or DB error → Redirecting to /collections')
-        return NextResponse.redirect(new URL('/collections', request.url))
-      }
-    } catch (err) {
-      console.error('[PROXY] Database fetch error:', err)
-      return NextResponse.redirect(new URL('/collections', request.url))
-    }
+  if (!needsAuth && !isAuthPage) {
+    return response;
   }
 
-  return response
+  if (!user) {
+    if (needsAuth) return redirectToLogin(request);
+    return response;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const role = profile?.role === "admin" ? "admin" : "customer";
+
+  if (isAuthPage) {
+    const target = role === "admin" ? "/dashboard" : "/customer-dashboard";
+    return NextResponse.redirect(new URL(target, request.url));
+  }
+
+  if (needsAdmin && role !== "admin") {
+    return NextResponse.redirect(new URL("/customer-dashboard", request.url));
+  }
+
+  if (needsCustomer && role === "admin") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (matchesPrefix(pathname, AUTH_REQUIRED_PREFIXES) && role === "admin") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-}
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

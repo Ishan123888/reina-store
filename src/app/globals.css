@@ -1,14 +1,11 @@
 @import "tailwindcss";
 
-/* Tailwind v4 සඳහා Dark Mode එක 'class' ක්‍රමයට සැකසීම */
-@theme {
-  --background: white;
-  --foreground: black;
-}
-
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ඩාර්ක් මෝඩ් එකට අවශ්‍ය පොදු CSS කිහිපයක් මෙතන දාන්න පුළුවන් */
+@theme {
+  --font-sans: "Inter", sans-serif;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -20,7 +17,74 @@
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  background: var(--background);
+}
+
+.app-surface {
+  min-height: 100vh;
+  background-color: #020408;
+  color: #f8fafc;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+}
+
+.glass-soft {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+}
+
+.glass-hover {
+  transition: all 0.5s;
+}
+.glass-hover:hover {
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+.hero-title {
+  font-family: "Syne", sans-serif;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+}
+
+.btn-primary-modern {
+  background: #22d3ee;
+  color: #020408;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.btn-outline-modern {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.btn-outline-modern:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+  transform: translateY(-1px);
+}
+
+.product-card:hover .product-img {
+  transform: scale(1.05);
 }
