@@ -1,9 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Package, Truck, CheckCircle, Clock, ExternalLink, Loader2, Download } from "lucide-react";
+import { Package, Truck, CheckCircle, Loader2, Download } from "lucide-react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+
+function normalizeOrderStatus(status?: string | null) {
+  switch ((status || "").toLowerCase()) {
+    case "pending":
+      return "Pending";
+    case "processing":
+      return "Processing";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status || "Pending";
+  }
+}
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -64,7 +81,9 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const filteredOrders = filter === "All" ? orders : orders.filter(o => o.status === filter);
+  const filteredOrders = filter === "All"
+    ? orders
+    : orders.filter(o => normalizeOrderStatus(o.status) === filter);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -101,7 +120,9 @@ export default function AdminOrdersPage() {
               <p className="text-gray-400 font-black uppercase text-xs tracking-widest">No orders found.</p>
             </div>
           ) : (
-            filteredOrders.map((order) => (
+            filteredOrders.map((order) => {
+              const normalizedStatus = normalizeOrderStatus(order.status);
+              return (
               <div key={order.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-500">
                 <div className="flex flex-col lg:flex-row justify-between gap-8">
                   
@@ -109,10 +130,10 @@ export default function AdminOrdersPage() {
                   <div className="space-y-4 flex-1">
                     <div className="flex items-center gap-3">
                       <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        order.status === 'Delivered' ? 'bg-green-100 text-green-600' : 
-                        order.status === 'Shipped' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
+                        normalizedStatus === 'Delivered' ? 'bg-green-100 text-green-600' : 
+                        normalizedStatus === 'Shipped' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'
                       }`}>
-                        {order.status}
+                        {normalizedStatus}
                       </span>
                       <span className="text-gray-300 font-bold text-[10px] uppercase">#{order.id.slice(0, 8)}</span>
                     </div>
@@ -176,7 +197,7 @@ export default function AdminOrdersPage() {
 
                 </div>
               </div>
-            ))
+            )})
           )}
         </div>
       </div>

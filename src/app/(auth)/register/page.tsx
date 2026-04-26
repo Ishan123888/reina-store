@@ -9,7 +9,8 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+import { resolveUserRole } from "@/core/auth/auth-helpers";
 
 /* Images */
 const images = [
@@ -42,10 +43,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabaseBrowserClient();
 
   /* Background slider */
   useEffect(() => {
@@ -78,7 +76,7 @@ export default function RegisterPage() {
         full_name: form.name,
         phone: form.phone,
         address: form.address,
-        role: "customer",
+        role: resolveUserRole(undefined, form.email),
       });
       setSuccess(true);
     }

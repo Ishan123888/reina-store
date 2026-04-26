@@ -23,19 +23,18 @@ export default function CartPage() {
   if (!mounted) return null;
 
   if (cart.length === 0) return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "#020408",
-      backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.9), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 24,
-      fontFamily: "'Inter', sans-serif"
-    }}>
+    <div
+      className="app-shell"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 24,
+        fontFamily: "'Inter', sans-serif",
+        ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@700&display=swap');
         @keyframes float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
@@ -64,16 +63,14 @@ export default function CartPage() {
   );
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "#020408",
-      backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.92), rgba(2, 4, 8, 0.96)), url("${bgImageUrl}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-      fontFamily: "'Inter', sans-serif",
-      paddingBottom: 80,
-    }}>
+    <div
+      className="app-shell"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        paddingBottom: 80,
+        ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@600;700&display=swap');
         
@@ -113,10 +110,6 @@ export default function CartPage() {
         .qty-action:hover { color: #22d3ee; }
 
         .summary-card {
-          background: rgba(255, 255, 255, 0.04);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
           padding: 32px;
           position: sticky;
           top: 40px;
@@ -148,7 +141,7 @@ export default function CartPage() {
         }
       `}</style>
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 24px" }}>
+      <div className="app-shell-inner" style={{ maxWidth: 1100, paddingTop: 60 }}>
         
         {/* Header */}
         <header style={{ marginBottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
@@ -207,7 +200,7 @@ export default function CartPage() {
 
           {/* Summary Section */}
           <aside>
-            <div className="summary-card">
+            <div className="summary-card glass-card">
               <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, marginBottom: 24 }}>Summary</h2>
               
               <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>

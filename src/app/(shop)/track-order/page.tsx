@@ -37,6 +37,83 @@ type Order = {
 
 const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
 
+function normalizeOrderStatus(status?: string | null) {
+  switch ((status || "").toLowerCase()) {
+    case "pending":
+      return "Pending";
+    case "processing":
+      return "Processing";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status || "Pending";
+  }
+}
+
+async function fetchOrdersForUser(supabase: ReturnType<typeof getSupabaseBrowserClient>, userId: string) {
+  const modern = await supabase
+    .from("orders")
+    .select("id,customer_name,address,status,total_amount,created_at,items")
+    .eq("customer_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (!modern.error && (modern.data?.length || 0) > 0) {
+    return modern.data as Order[];
+  }
+
+  const legacy = await supabase
+    .from("orders")
+    .select("id,customer_name,address,status,total_amount,created_at,items")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (!legacy.error) {
+    return (legacy.data as Order[]) || [];
+  }
+
+  if (!modern.error) {
+    return (modern.data as Order[]) || [];
+  }
+
+  throw legacy.error ?? modern.error;
+}
+
+async function findOrderForUser(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  orderId: string,
+  userId: string
+) {
+  const modern = await supabase
+    .from("orders")
+    .select("id,customer_name,address,status,total_amount,created_at,items")
+    .eq("id", orderId)
+    .eq("customer_id", userId)
+    .single();
+
+  if (!modern.error && modern.data) {
+    return modern.data as Order;
+  }
+
+  const legacy = await supabase
+    .from("orders")
+    .select("id,customer_name,address,status,total_amount,created_at,items")
+    .eq("id", orderId)
+    .eq("user_id", userId)
+    .single();
+
+  if (!legacy.error && legacy.data) {
+    return legacy.data as Order;
+  }
+
+  throw legacy.error ?? modern.error ?? new Error("not_found");
+}
+
 function TrackOrderContent() {
   const searchParams = useSearchParams();
   const initialOrderId = searchParams.get("orderId") || "";
@@ -63,14 +140,7 @@ function TrackOrderContent() {
 
       setUserId(user.id);
 
-      const { data } = await supabase
-        .from("orders")
-        .select("id,customer_name,address,status,total_amount,created_at,items")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(12);
-
-      const rows = (data as Order[]) || [];
+      const rows = await fetchOrdersForUser(supabase, user.id);
       setOrders(rows);
       setAuthLoading(false);
 
@@ -102,15 +172,8 @@ function TrackOrderContent() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { data, error: findError } = await supabase
-        .from("orders")
-        .select("id,customer_name,address,status,total_amount,created_at,items")
-        .eq("id", cleanId)
-        .eq("user_id", uid)
-        .single();
-
-      if (findError || !data) throw new Error("not_found");
-      setOrder(data as Order);
+      const data = await findOrderForUser(supabase, cleanId, uid);
+      setOrder(data);
     } catch {
       setError("No order found for this account with that ID.");
     } finally {
@@ -127,13 +190,13 @@ function TrackOrderContent() {
   };
 
   const statusTone = useMemo(
-    () => (order ? statusConfig[order.status] || statusConfig.Pending : statusConfig.Pending),
+    () => (order ? statusConfig[normalizeOrderStatus(order.status)] || statusConfig.Pending : statusConfig.Pending),
     [order]
   );
 
   if (authLoading) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#020408" }}>
+      <div className="app-shell app-shell-muted" style={{ display: "grid", placeItems: "center" }}>
         <Loader2 size={34} className="animate-spin" style={{ color: "#22d3ee" }} />
       </div>
     );
@@ -142,27 +205,22 @@ function TrackOrderContent() {
   if (!userId) {
     return (
       <div
+        className="app-shell"
         style={{
-          minHeight: "100vh",
-          backgroundColor: "#020408",
-          backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.88), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
           display: "grid",
           placeItems: "center",
           padding: 24,
           fontFamily: "'Inter', sans-serif",
+          ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
         }}
       >
         <div
+          className="glass-card"
           style={{
             maxWidth: 420,
             width: "100%",
             borderRadius: 22,
             padding: 30,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            backdropFilter: "blur(18px)",
             textAlign: "center",
             color: "#fff",
           }}
@@ -213,27 +271,19 @@ function TrackOrderContent() {
 
   return (
     <div
+      className="app-shell"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#020408",
-        backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.9), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
         color: "#f8fafc",
         fontFamily: "'Inter', sans-serif",
         display: "grid",
         placeItems: "center",
         padding: "40px 20px",
+        ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
       }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@600;700&display=swap');
         .glass-card {
-          background: rgba(255, 255, 255, 0.04);
-          backdrop-filter: blur(22px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 24px;
           width: 100%;
           max-width: 680px;
           padding: 26px;
@@ -351,7 +401,7 @@ function TrackOrderContent() {
                   height: "fit-content",
                 }}
               >
-                {order.status}
+                {normalizeOrderStatus(order.status)}
               </span>
             </div>
 

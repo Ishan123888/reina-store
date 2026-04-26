@@ -8,12 +8,14 @@ import {
   Clock3,
   Download,
   Loader2,
+  LogOut,
   Package,
   ShoppingBag,
   Truck,
   User,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+import { resolveUserRole } from "@/core/auth/auth-helpers";
 
 type Profile = {
   id: string;
@@ -43,11 +45,57 @@ type Order = {
 
 const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
 
+function normalizeOrderStatus(status?: string | null) {
+  switch ((status || "").toLowerCase()) {
+    case "pending":
+      return "Pending";
+    case "processing":
+      return "Processing";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status || "Pending";
+  }
+}
+
+async function fetchOrdersForUser(supabase: ReturnType<typeof getSupabaseBrowserClient>, userId: string) {
+  const modern = await supabase
+    .from("orders")
+    .select("id,status,total_amount,created_at,items")
+    .eq("customer_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (!modern.error && (modern.data?.length || 0) > 0) {
+    return modern.data as Order[];
+  }
+
+  const legacy = await supabase
+    .from("orders")
+    .select("id,status,total_amount,created_at,items")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (!legacy.error) {
+    return (legacy.data as Order[]) || [];
+  }
+
+  if (!modern.error) {
+    return (modern.data as Order[]) || [];
+  }
+
+  throw legacy.error ?? modern.error;
+}
+
 export default function CustomerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -67,25 +115,22 @@ export default function CustomerDashboardPage() {
         .eq("id", user.id)
         .maybeSingle();
 
-      const role = (profileData as Profile | null)?.role ?? "customer";
+      const role = resolveUserRole(profileData?.role, user.email);
       if (role === "admin") {
         window.location.href = "/dashboard";
         return;
       }
 
-      setProfile((profileData as Profile | null) ?? {
-        id: user.id,
-        email: user.email,
-        role: "customer",
-      });
+      setProfile(
+        (profileData as Profile | null) ?? {
+          id: user.id,
+          email: user.email,
+          role: "customer",
+        }
+      );
 
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("id,status,total_amount,created_at,items")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      setOrders((orderData as Order[]) || []);
+      const orderData = await fetchOrdersForUser(supabase, user.id);
+      setOrders(orderData);
       setLoading(false);
     }
 
@@ -114,10 +159,17 @@ export default function CustomerDashboardPage() {
     }
   }
 
+  async function handleLogout() {
+    setSigningOut(true);
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
+
   const stats = useMemo(() => {
     const totalOrders = orders.length;
-    const pending = orders.filter((o) => o.status === "Pending").length;
-    const delivered = orders.filter((o) => o.status === "Delivered").length;
+    const pending = orders.filter((o) => normalizeOrderStatus(o.status) === "Pending").length;
+    const delivered = orders.filter((o) => normalizeOrderStatus(o.status) === "Delivered").length;
     const spent = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     return { totalOrders, pending, delivered, spent };
   }, [orders]);
@@ -225,6 +277,28 @@ export default function CustomerDashboardPage() {
               >
                 View Cart
               </Link>
+              <button
+                onClick={handleLogout}
+                disabled={signingOut}
+                style={{
+                  color: "#fff",
+                  background: "rgba(239,68,68,0.18)",
+                  border: "1px solid rgba(248,113,113,0.24)",
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                }}
+              >
+                {signingOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+                Logout
+              </button>
             </div>
           </div>
 
@@ -261,6 +335,7 @@ export default function CustomerDashboardPage() {
             <ProfileRow label="Email" value={profile?.email || "-"} />
             <ProfileRow label="Phone" value={profile?.phone || "-"} />
             <ProfileRow label="Address" value={profile?.address || "-"} />
+            <ProfileRow label="Role" value={profile?.role || "customer"} />
           </div>
 
           <div className="glass" style={{ padding: 20 }}>
@@ -405,13 +480,15 @@ function StatCard({ icon, label, value }: { icon: ReactNode; label: string; valu
 }
 
 function StatusPill({ status }: { status: string }) {
+  const normalizedStatus = normalizeOrderStatus(status);
   const map: Record<string, { fg: string; bg: string }> = {
     Pending: { fg: "#fbbf24", bg: "rgba(251,191,36,0.14)" },
+    Processing: { fg: "#22d3ee", bg: "rgba(34,211,238,0.14)" },
     Shipped: { fg: "#60a5fa", bg: "rgba(96,165,250,0.14)" },
     Delivered: { fg: "#34d399", bg: "rgba(52,211,153,0.14)" },
     Cancelled: { fg: "#f87171", bg: "rgba(248,113,113,0.14)" },
   };
-  const tone = map[status] ?? { fg: "#fff", bg: "rgba(255,255,255,0.16)" };
+  const tone = map[normalizedStatus] ?? { fg: "#fff", bg: "rgba(255,255,255,0.16)" };
 
   return (
     <span
@@ -424,7 +501,7 @@ function StatusPill({ status }: { status: string }) {
         background: tone.bg,
       }}
     >
-      {status}
+      {normalizedStatus}
     </span>
   );
 }

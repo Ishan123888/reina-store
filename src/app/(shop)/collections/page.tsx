@@ -41,30 +41,19 @@ export default function CollectionsPage() {
   const filtered = activeCategory === "All" ? products : products.filter(p => p.category === activeCategory);
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "#020408",
-      backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.9), rgba(2, 4, 8, 0.95)), url("${bgImageUrl}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-      color: "#f8fafc",
-      fontFamily: "'Inter', sans-serif",
-      paddingBottom: 80,
-    }}>
+    <div
+      className="app-shell"
+      style={{
+        color: "#f8fafc",
+        fontFamily: "'Inter', sans-serif",
+        paddingBottom: 80,
+        ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@600;700&display=swap');
         
-        .glass-header {
-          background: rgba(255, 255, 255, 0.02);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
         .product-card {
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 16px;
           transition: all 0.4s ease;
         }
@@ -129,7 +118,7 @@ export default function CollectionsPage() {
         }
       `}</style>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px" }}>
+      <div className="app-shell-inner" style={{ maxWidth: 1200, paddingTop: 60 }}>
         
         {/* Header Section */}
         <header style={{ marginBottom: 60 }}>
@@ -142,21 +131,19 @@ export default function CollectionsPage() {
           <h1 className="section-title" style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", marginBottom: 16 }}>
             Explore <span style={{ color: "#22d3ee" }}>Collections.</span>
           </h1>
-          <p style={{ color: "rgba(255,255,255,0.5)", maxWidth: 500, lineHeight: 1.6, fontSize: 15 }}>
+          <p className="section-copy" style={{ maxWidth: 500, fontSize: 15 }}>
             Discover our curated range of premium footwear designed for comfort and crafted with elegance.
           </p>
         </header>
 
         {/* Filters */}
-        <div style={{ 
+        <div className="glass-panel" style={{ 
           display: "flex", 
           flexWrap: "wrap", 
           gap: 10, 
           marginBottom: 40,
           padding: "24px",
-          background: "rgba(255,255,255,0.02)",
           borderRadius: "16px",
-          border: "1px solid rgba(255,255,255,0.05)"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 10, color: "rgba(255,255,255,0.3)" }}>
             <Filter size={16} />
@@ -186,7 +173,7 @@ export default function CollectionsPage() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 30 }}>
             {filtered.map((p) => (
-              <div key={p.id} className="product-card">
+              <div key={p.id} className="product-card glass-panel glass-hover">
                 {/* Product Image */}
                 <Link href={`/product/${p.id}`} style={{ display: "block", position: "relative", height: 320, borderRadius: "16px 16px 0 0", overflow: "hidden" }}>
                   <Image 

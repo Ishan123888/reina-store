@@ -1,22 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const ADMIN_PREFIXES = ["/dashboard", "/add-product", "/orders", "/customers"];
-const CUSTOMER_ONLY_PREFIXES = ["/customer-dashboard"];
-const AUTH_REQUIRED_PREFIXES = [
-  "/collections",
-  "/product",
-  "/cart",
-  "/checkout",
-  "/track-order",
-  "/order-success",
-];
-
-function matchesPrefix(pathname: string, prefixes: string[]) {
-  return prefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
-}
+import {
+  ADMIN_PREFIXES,
+  AUTH_REQUIRED_PREFIXES,
+  CUSTOMER_ONLY_PREFIXES,
+  getDashboardPath,
+  matchesPrefix,
+  resolveUserRole,
+} from "@/core/auth/auth-helpers";
 
 function redirectToLogin(request: NextRequest) {
   const url = request.nextUrl.clone();
@@ -81,11 +72,10 @@ export default async function proxy(request: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
 
-  const role = profile?.role === "admin" ? "admin" : "customer";
+  const role = resolveUserRole(profile?.role, user.email);
 
   if (isAuthPage) {
-    const target = role === "admin" ? "/dashboard" : "/customer-dashboard";
-    return NextResponse.redirect(new URL(target, request.url));
+    return NextResponse.redirect(new URL(getDashboardPath(role), request.url));
   }
 
   if (needsAdmin && role !== "admin") {

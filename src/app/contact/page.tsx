@@ -55,33 +55,23 @@ export default function ContactPage() {
   const bgImageUrl = "https://i.imgur.com/6VS5Ue8.png";
 
   return (
-    <div style={{ 
-      minHeight: "100vh", 
-      backgroundColor: "#020408", 
-      backgroundImage: `linear-gradient(rgba(2, 4, 8, 0.82), rgba(2, 4, 8, 0.82)), url("${bgImageUrl}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-      fontFamily: "'Inter', sans-serif", 
-      position: "relative", 
-      overflowX: "hidden", 
-      paddingBottom: 40 
-    }}>
+    <div
+      className="app-shell"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        position: "relative",
+        overflowX: "hidden",
+        paddingBottom: 40,
+        ["--page-bg-image" as string]: `url("${bgImageUrl}")`,
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Syne:wght@600;700&display=swap');
         
         .fade-up { animation: fade-up 0.6s ease-out both; }
         @keyframes fade-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
-        .glass { background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        
         .input-group { position: relative; width: 100%; }
-        .glass-input { 
-          background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); 
-          color: #fff; width: 100%; padding: 12px 16px; border-radius: 12px; font-size: 14px; 
-          outline: none; transition: 0.2s; box-sizing: border-box; font-family: 'Inter', sans-serif;
-        }
-        .glass-input:focus { border-color: #22d3ee; background: rgba(6, 182, 212, 0.05); }
         .error-text { color: #ef4444; font-size: 11px; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
         
         .send-btn { 
@@ -94,9 +84,7 @@ export default function ContactPage() {
       `}</style>
 
       {/* Background Dots Overlay */}
-      <div style={{ position: "fixed", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "40px 40px", pointerEvents: "none" }} />
-
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px 0", position: "relative", zIndex: 1 }}>
+      <div className="app-shell-inner" style={{ maxWidth: 1100, paddingTop: 80 }}>
         
         {/* Header Section */}
         <div className="fade-up" style={{ textAlign: "center", marginBottom: 50 }}>
@@ -104,10 +92,10 @@ export default function ContactPage() {
             <Sparkles size={12} style={{ color: "#22d3ee" }} />
             <span style={{ fontSize: 10, fontWeight: 600, color: "#22d3ee", letterSpacing: "1px", textTransform: "uppercase" }}>Contact Us</span>
           </div>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 700, color: "#fff", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
+          <h1 className="section-title" style={{ fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 700, margin: "0 0 12px" }}>
             Let's Start a <span style={{ color: "#22d3ee" }}>Conversation</span>
           </h1>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", maxWidth: 500, margin: "0 auto", fontWeight: 400, lineHeight: 1.6 }}>
+          <p className="section-copy" style={{ fontSize: 15, maxWidth: 500, margin: "0 auto", fontWeight: 400 }}>
             Have questions about our slippers? Reach out to us and we'll get back to you within 24 hours.
           </p>
         </div>
@@ -117,7 +105,7 @@ export default function ContactPage() {
           {/* Info Side */}
           <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {infoCards.map((card, i) => (
-              <div key={i} className="glass" style={{ padding: 22, borderRadius: 18, display: "flex", gap: 18, alignItems: "center" }}>
+              <div key={i} className="glass-panel glass-hover" style={{ padding: 22, borderRadius: 18, display: "flex", gap: 18, alignItems: "center" }}>
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: `${card.color}15`, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${card.color}30` }}>
                   <card.icon size={18} style={{ color: card.color }} />
                 </div>
@@ -131,7 +119,7 @@ export default function ContactPage() {
           </div>
 
           {/* Form Side */}
-          <div className="glass fade-up" style={{ padding: 32, borderRadius: 24 }}>
+          <div className="glass-card fade-up" style={{ padding: 32, borderRadius: 24 }}>
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

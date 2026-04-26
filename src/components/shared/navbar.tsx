@@ -2,11 +2,24 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingCart, Menu, X, Sun, Moon, Crown, User, LogOut } from "lucide-react";
+import {
+  ShoppingCart,
+  Menu,
+  X,
+  Sun,
+  Moon,
+  Crown,
+  User,
+  LogOut,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { useTheme } from "next-themes";
-import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
+import {
+  getDashboardPath,
+  resolveUserRole,
+} from "@/core/auth/auth-helpers";
 
 interface UserProfile {
   id: string;
@@ -20,19 +33,14 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [supabase] = useState(() => getSupabaseBrowserClient());
   const { theme, setTheme } = useTheme();
   const { cartCount } = useCart();
+  const navBackgroundImage = "/contact-bg.png";
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  // Sign Out Function
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      // '/login' එකට redirect කරනවා. window.location පාවිච්චි කරන්නේ session එක සම්පූර්ණයෙන්ම clear වෙන්නයි.
       window.location.href = "/login";
     } catch (error) {
       console.error("Error signing out:", error);
@@ -58,18 +66,15 @@ export default function Navbar() {
         .from("profiles")
         .select("id, role, full_name, email")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (!profile) {
-        setUserProfile(null);
-        return;
-      }
+      const role = resolveUserRole(profile?.role, user.email);
 
       setUserProfile({
         id: user.id,
-        role: (profile as any).role || "customer",
-        full_name: (profile as any).full_name,
-        email: (profile as any).email || user.email,
+        role,
+        full_name: profile?.full_name ?? null,
+        email: profile?.email ?? user.email ?? null,
       });
     }
 
@@ -82,10 +87,11 @@ export default function Navbar() {
       subscription.unsubscribe();
       window.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [supabase]);
 
   const isAdmin = userProfile?.role === "admin";
-  const displayName = userProfile?.full_name || userProfile?.email?.split("@")[0] || "User";
+  const displayName =
+    userProfile?.full_name || userProfile?.email?.split("@")[0] || "User";
 
   const navLinks = userProfile
     ? isAdmin
@@ -101,41 +107,49 @@ export default function Navbar() {
         { href: "/contact", label: "Contact" },
       ];
 
-  const userIconHref = userProfile 
-    ? (isAdmin ? "/dashboard" : "/customer-dashboard") 
+  const userIconHref = userProfile
+    ? getDashboardPath(userProfile.role as "admin" | "customer")
     : "/login";
 
   return (
     <nav
-      className={`sticky top-0 z-50 font-sans transition-all duration-500 ${
+      className={`sticky top-0 z-50 overflow-hidden font-sans transition-all duration-500 ${
         scrolled
-          ? "bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/30"
-          : "bg-white/75 dark:bg-slate-950/75 backdrop-blur-lg"
-      } border-b border-gray-100/40 dark:border-slate-800/40`}
+          ? "bg-white/72 dark:bg-slate-950/70 backdrop-blur-2xl shadow-xl shadow-slate-950/10 dark:shadow-black/30"
+          : "bg-white/58 dark:bg-slate-950/52 backdrop-blur-xl"
+      } border-b border-white/35 dark:border-white/10`}
+      style={{
+        backgroundImage: `linear-gradient(90deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72)), url("${navBackgroundImage}")`,
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+      }}
     >
+      <div
+        className="pointer-events-none absolute inset-0 hidden dark:block"
+        style={{
+          backgroundImage: `linear-gradient(90deg, rgba(2,6,23,0.88), rgba(2,6,23,0.74)), url("${navBackgroundImage}")`,
+          backgroundPosition: "center",
+          backgroundSize: "cover",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-white/20 dark:bg-slate-950/20" />
+
       <style>{`
         @keyframes badge-pop {
-          0%   { transform: scale(0); }
-          70%  { transform: scale(1.25); }
+          0% { transform: scale(0); }
+          70% { transform: scale(1.25); }
           100% { transform: scale(1); }
         }
         .badge-pop { animation: badge-pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
       `}</style>
 
-      <div className="container mx-auto px-6 h-20 flex items-center justify-between">
+      <div className="relative container mx-auto px-6 h-20 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-4 group">
           <div className="relative w-14 h-14 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full scale-[2.2] bg-blue-500/10 blur-2xl group-hover:bg-blue-400/25 group-hover:scale-[2.8] transition-all duration-700" />
             <div className="absolute inset-0 rounded-full scale-[1.5] bg-blue-500/15 blur-lg group-hover:bg-blue-400/35 group-hover:scale-[1.8] transition-all duration-500" />
             <div
-              className="relative w-14 h-14 rounded-full overflow-hidden
-              border-2 border-blue-400/60
-              group-hover:border-blue-300/90
-              bg-white dark:bg-slate-900
-              shadow-[0_0_20px_rgba(59,130,246,0.35)]
-              group-hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]
-              group-hover:scale-110
-              transition-all duration-500 ease-out z-10"
+              className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-blue-400/60 group-hover:border-blue-300/90 bg-white dark:bg-slate-900 shadow-[0_0_20px_rgba(59,130,246,0.35)] group-hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] group-hover:scale-110 transition-all duration-500 ease-out z-10"
             >
               <Image
                 src="https://imgur.com/gQqHcDM.png"
@@ -163,26 +177,40 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-1 rounded-full border border-white/45 bg-white/45 px-2 py-1 shadow-lg shadow-slate-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/35 dark:shadow-black/20">
           {navLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="relative px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 group"
+              className="relative rounded-full px-4 py-2 text-sm font-medium tracking-[0.02em] text-slate-700 dark:text-slate-200 transition-colors duration-200 hover:text-blue-600 dark:hover:text-blue-300 group"
             >
               {item.label}
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-linear-to-r from-blue-600 to-indigo-600 rounded-full group-hover:w-3/4 transition-all duration-300" />
+              <span className="absolute bottom-1 left-1/2 h-px w-0 -translate-x-1/2 rounded-full bg-linear-to-r from-blue-500 to-cyan-400 transition-all duration-300 group-hover:w-2/3" />
             </Link>
           ))}
         </div>
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-2 md:gap-2.5">
+          {userProfile && (
+            <div className="hidden lg:flex items-center gap-3 rounded-2xl border border-white/45 bg-white/50 px-3 py-2 shadow-lg shadow-slate-950/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/35 dark:shadow-black/20">
+              <div className="text-right leading-tight">
+                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {userProfile.role}
+                </p>
+                <p className="max-w-45 truncate text-sm font-medium text-slate-900 dark:text-white">
+                  {displayName}
+                </p>
+                <p className="max-w-45 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                  {userProfile.email}
+                </p>
+              </div>
+            </div>
+          )}
+
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border border-gray-200/60 dark:border-slate-700/60 hover:scale-110 transition-all duration-300 outline-none"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-white/55 text-slate-600 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition-all duration-300 hover:scale-110 dark:border-white/10 dark:bg-slate-900/35 dark:text-slate-300 dark:shadow-black/20 outline-none"
               aria-label="Toggle Theme"
             >
               {theme === "dark" ? (
@@ -196,9 +224,12 @@ export default function Navbar() {
           {!isAdmin && (
             <Link
               href="/cart"
-              className="relative w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border border-gray-200/60 dark:border-slate-700/60 hover:scale-110 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-gray-500 dark:text-gray-400 transition-all duration-300 group"
+              className="group relative flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-white/55 text-slate-600 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:bg-blue-50/80 dark:border-white/10 dark:bg-slate-900/35 dark:text-slate-300 dark:shadow-black/20 dark:hover:bg-blue-950/30"
             >
-              <ShoppingCart size={15} className="group-hover:-translate-y-0.5 transition-transform" />
+              <ShoppingCart
+                size={15}
+                className="group-hover:-translate-y-0.5 transition-transform"
+              />
               {mounted && cartCount > 0 && (
                 <span className="badge-pop absolute -top-1 -right-1 bg-blue-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-black shadow-[0_2px_8px_rgba(59,130,246,0.5)]">
                   {cartCount}
@@ -209,17 +240,20 @@ export default function Navbar() {
 
           <Link
             href={userIconHref}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border border-gray-200/60 dark:border-slate-700/60 text-gray-500 dark:text-gray-400 hover:scale-110 transition-all duration-300"
-            title={userProfile ? `${displayName} (${isAdmin ? "Admin" : "Customer"})` : "Login"}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-white/55 text-slate-600 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition-all duration-300 hover:scale-110 dark:border-white/10 dark:bg-slate-900/35 dark:text-slate-300 dark:shadow-black/20"
+            title={
+              userProfile
+                ? `${displayName} (${isAdmin ? "Admin" : "Customer"})`
+                : "Login"
+            }
           >
             {isAdmin ? <Crown size={15} /> : <User size={15} />}
           </Link>
 
-          {/* New Sign Out Button - Only visible when logged in */}
           {userProfile && (
             <button
               onClick={handleSignOut}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-500 dark:text-red-400 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 transition-all duration-300 hover:scale-110"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-red-200/60 bg-red-50/80 text-red-500 shadow-lg shadow-red-500/10 backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:bg-red-500 hover:text-white dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-500"
               title="Sign Out"
             >
               <LogOut size={15} />
@@ -227,36 +261,60 @@ export default function Navbar() {
           )}
 
           <button
-            className="md:hidden w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 dark:bg-slate-800 border border-gray-200/60 dark:border-slate-700/60 text-gray-900 dark:text-white"
-            onClick={() => setIsOpen(!isOpen)}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-white/55 text-slate-900 shadow-lg shadow-slate-950/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/35 dark:text-white dark:shadow-black/20 md:hidden"
+            onClick={() => setIsOpen((prev) => !prev)}
           >
             {isOpen ? <X size={15} /> : <Menu size={15} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-gray-100/50 dark:border-slate-800/50 px-6 py-6 flex flex-col gap-5">
-          {navLinks.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setIsOpen(false)}
-              className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              {item.label}
-            </Link>
-          ))}
-          {/* Mobile Sign Out */}
-          {userProfile && (
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.25em] text-red-500 mt-2"
-            >
-              <LogOut size={15} /> Sign Out
-            </button>
-          )}
+        <div className="relative border-t border-white/30 bg-white/68 px-6 py-6 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/70 md:hidden">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-70"
+            style={{
+              backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4)), url("${navBackgroundImage}")`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 hidden dark:block bg-slate-950/35" />
+          <div className="relative flex flex-col gap-5">
+            {userProfile && (
+              <div className="rounded-2xl border border-white/45 bg-white/45 px-4 py-3 shadow-lg shadow-slate-950/5 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:shadow-black/20">
+                <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {userProfile.role}
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                  {displayName}
+                </p>
+                <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
+                  {userProfile.email}
+                </p>
+              </div>
+            )}
+
+            {navLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className="rounded-2xl border border-white/40 bg-white/35 px-4 py-3 text-sm font-medium tracking-[0.02em] text-slate-700 shadow-lg shadow-slate-950/5 backdrop-blur-xl transition-colors hover:text-blue-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:shadow-black/20 dark:hover:text-blue-300"
+              >
+                {item.label}
+              </Link>
+            ))}
+
+            {userProfile && (
+              <button
+                onClick={handleSignOut}
+                className="mt-2 flex items-center gap-3 rounded-2xl border border-red-200/60 bg-red-50/80 px-4 py-3 text-sm font-medium tracking-[0.02em] text-red-500 shadow-lg shadow-red-500/10 backdrop-blur-xl dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-400"
+              >
+                <LogOut size={15} /> Sign Out
+              </button>
+            )}
+          </div>
         </div>
       )}
     </nav>

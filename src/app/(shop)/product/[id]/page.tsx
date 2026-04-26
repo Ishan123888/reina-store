@@ -37,7 +37,7 @@ export default function ProductDetails() {
   };
 
   if (loading) return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#020408,#040d1a,#020810)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+    <div className="app-shell app-shell-muted" style={{display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <Loader2 size={36} style={{color:"#22d3ee",animation:"spin 0.8s linear infinite"}} />
       <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.3em",color:"rgba(255,255,255,0.3)",fontFamily:"'DM Sans',sans-serif"}}>Loading Product...</p>
@@ -45,13 +45,13 @@ export default function ProductDetails() {
   );
 
   if (!product) return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#020408,#040d1a)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div className="app-shell app-shell-muted" style={{display:"flex",alignItems:"center",justifyContent:"center"}}>
       <p style={{color:"rgba(255,255,255,0.4)",fontFamily:"'DM Sans',sans-serif"}}>Product not found!</p>
     </div>
   );
 
   return (
-    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#020408 0%,#040d1a 40%,#020810 70%,#060208 100%)",fontFamily:"'DM Sans',sans-serif",position:"relative",overflow:"hidden"}}>
+    <div className="app-shell" style={{fontFamily:"'DM Sans',sans-serif",position:"relative",overflow:"hidden"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -60,12 +60,6 @@ export default function ProductDetails() {
         .fade-in{animation:fade-in 0.6s cubic-bezier(0.22,1,0.36,1) both}
         .d1{animation-delay:0.1s}.d2{animation-delay:0.2s}.d3{animation-delay:0.3s}
         
-        .glass-panel{
-          background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));
-          backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
-          border:1px solid rgba(255,255,255,0.08);
-          box-shadow:0 24px 60px rgba(0,0,0,0.5);
-        }
         .size-btn{
           padding:10px 18px;border-radius:12px;font-family:'Syne',sans-serif;
           font-size:11px;font-weight:800;cursor:pointer;transition:all 0.2s ease;
@@ -102,7 +96,7 @@ export default function ProductDetails() {
       <div style={{position:"fixed",bottom:"10%",left:"5%",width:350,height:350,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,0.08) 0%,transparent 70%)",filter:"blur(60px)",pointerEvents:"none"}} />
       <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(6,182,212,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,0.02) 1px,transparent 1px)",backgroundSize:"60px 60px",pointerEvents:"none"}} />
 
-      <div style={{maxWidth:1200,margin:"0 auto",padding:"40px 24px",position:"relative",zIndex:1}}>
+      <div className="app-shell-inner" style={{maxWidth:1200,paddingTop:40}}>
         <Link href="/collections" className="fade-in" style={{display:"inline-flex",alignItems:"center",gap:8,color:"rgba(99,212,240,0.5)",textDecoration:"none",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.3em",marginBottom:40,transition:"color 0.2s"}}>
           <ArrowLeft size={14}/> Back to Collections
         </Link>

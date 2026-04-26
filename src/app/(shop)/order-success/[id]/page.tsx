@@ -9,6 +9,17 @@ import { CheckCircle2, Copy, Truck, Download, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/core/configs/supabase-browser";
 
+function isAbortLikeError(error: unknown) {
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+  if (error && typeof error === "object") {
+    const known = error as { name?: string; message?: string };
+    return known.name === "AbortError" || known.message === "signal is aborted without reason";
+  }
+  return false;
+}
+
 export default function OrderSuccessPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<any>(null);
@@ -16,9 +27,23 @@ export default function OrderSuccessPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    supabase.from("orders").select("*").eq("id", id).single()
-      .then(({ data }) => setOrder(data || null));
+    let isActive = true;
+
+    async function loadOrder() {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data, error } = await supabase.from("orders").select("*").eq("id", id).single();
+        if (error) throw error;
+        if (isActive) setOrder(data || null);
+      } catch (error) {
+        if (!isAbortLikeError(error)) {
+          console.error("Order success load failed:", error);
+        }
+      }
+    }
+
+    loadOrder();
+    return () => { isActive = false; };
   }, [id]);
 
   const copyId = async () => {
@@ -35,11 +60,15 @@ export default function OrderSuccessPage() {
       const link = document.createElement("a");
       link.href = url; link.download = `Invoice-${String(id).substring(0, 8).toUpperCase()}.html`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
-    } catch { alert("Failed to generate invoice"); } finally { setGeneratingInvoice(false); }
+    } catch (error) {
+      if (!isAbortLikeError(error)) {
+        alert("Failed to generate invoice");
+      }
+    } finally { setGeneratingInvoice(false); }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg,#020408 0%,#040d1a 40%,#020810 70%,#060208 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'DM Sans',sans-serif", position: "relative", overflow: "hidden" }}>
+    <div className="app-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'DM Sans',sans-serif", position: "relative", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -49,7 +78,6 @@ export default function OrderSuccessPage() {
         .card-in{animation:card-in 0.7s cubic-bezier(0.22,1,0.36,1) both}
         .check-pop{animation:check-pop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.3s both}
         .glow-pulse{animation:glow 2.5s ease-in-out infinite}
-        .glass{background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,0.08);box-shadow:0 32px 80px rgba(0,0,0,0.6)}
         .action-btn{padding:14px 20px;border-radius:14px;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.3s ease;flex:1;text-decoration:none}
       `}</style>
 
@@ -58,7 +86,7 @@ export default function OrderSuccessPage() {
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(6,182,212,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,0.02) 1px,transparent 1px)", backgroundSize: "60px 60px", pointerEvents: "none" }} />
 
       <div className="card-in" style={{ maxWidth: 480, width: "100%", position: "relative" }}>
-        <div className="glass" style={{ borderRadius: 28, padding: "48px 36px", position: "relative", overflow: "hidden", textAlign: "center" }}>
+        <div className="glass-card" style={{ borderRadius: 28, padding: "48px 36px", position: "relative", overflow: "hidden", textAlign: "center" }}>
           <div style={{ position: "absolute", top: 0, left: "20%", right: "20%", height: 1, background: "linear-gradient(90deg,transparent,rgba(16,185,129,0.5),transparent)" }} />
 
           {/* Check icon */}
